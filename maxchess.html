@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MaxChess</title>
+<title>Chess</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -41,15 +41,18 @@ h1{font-size:clamp(1.3rem,3vw,1.9rem);font-weight:400;letter-spacing:.35em;text-
 .dbtn.active{border-color:var(--accent);color:var(--accent);background:rgba(201,168,108,.07);}
 .delo{opacity:.5;font-size:.54rem;}
 .dbtn.active .delo{opacity:.8;}
+/* Board themes */
 .trow{display:flex;gap:5px;flex-wrap:wrap;}
 .tsw{width:26px;height:26px;border:2px solid transparent;cursor:pointer;display:flex;overflow:hidden;transition:border-color .2s;}
 .tsw:hover{border-color:var(--muted);}.tsw.active{border-color:var(--accent);}
 .tsw div{flex:1;}
+/* Piece color pickers */
 .pcols{display:flex;gap:12px;align-items:center;}
 .pcol-item{display:flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);}
 .cprev{width:30px;height:30px;border:1px solid var(--border);border-radius:50%;cursor:pointer;position:relative;overflow:hidden;}
 .cprev:hover{border-color:var(--accent);}
 .cprev input[type=color]{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;}
+/* Move list */
 .mlist{font-family:'DM Mono',monospace;font-size:.63rem;color:var(--muted);max-height:160px;overflow-y:auto;line-height:1.9;}
 .mlist::-webkit-scrollbar{width:3px;}.mlist::-webkit-scrollbar-thumb{background:var(--border);}
 .mrow{display:flex;gap:4px;}
@@ -59,6 +62,7 @@ h1{font-size:clamp(1.3rem,3vw,1.9rem);font-weight:400;letter-spacing:.35em;text-
 .btn{width:100%;padding:9px;background:transparent;border:1px solid var(--border);color:var(--muted);
   font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.18em;text-transform:uppercase;cursor:pointer;transition:all .2s;}
 .btn:hover{border-color:var(--accent);color:var(--accent);}
+/* Board */
 .bc{display:inline-flex;flex-direction:column;align-items:flex-start;background:var(--surface);border:1px solid var(--border);box-shadow:0 24px 64px rgba(0,0,0,.55);padding:20px 22px 18px 18px;}
 .coord-files{display:flex;margin-left:18px;margin-bottom:3px;}
 .coord-files span{width:64px;text-align:center;font-family:'DM Mono',monospace;font-size:.5rem;color:var(--muted);}
@@ -77,6 +81,7 @@ h1{font-size:clamp(1.3rem,3vw,1.9rem);font-weight:400;letter-spacing:.35em;text-
 .sq.l.vc::after{box-shadow:inset 0 0 0 5px rgba(0,0,0,.15);}
 .piece{display:block;width:86%;height:86%;pointer-events:none;transition:transform .12s;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.55));}
 .sq:hover .piece{transform:scale(1.1);}
+/* Blunder banner */
 .blunder-banner{display:none;position:fixed;top:0;left:0;right:0;z-index:200;background:#8b0000;color:#fff;
   font-family:'Cormorant Garamond',serif;font-size:clamp(1.4rem,3vw,2.2rem);font-style:italic;
   text-align:center;padding:14px 20px;letter-spacing:.06em;
@@ -84,6 +89,7 @@ h1{font-size:clamp(1.3rem,3vw,1.9rem);font-weight:400;letter-spacing:.35em;text-
   animation:slideDown .3s ease;}
 .blunder-banner.show{display:block;}
 @keyframes slideDown{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
+/* Eval bar */
 .eval-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;margin-left:10px;}
 .eval-bar-outer{width:18px;height:512px;background:#1a1a1a;border:1px solid var(--border);position:relative;overflow:hidden;border-radius:2px;}
 .eval-bar-white{position:absolute;bottom:0;left:0;right:0;background:#f0e6cc;transition:height 0.4s ease;border-radius:0 0 1px 1px;}
@@ -101,7 +107,7 @@ h1{font-size:clamp(1.3rem,3vw,1.9rem);font-weight:400;letter-spacing:.35em;text-
 </style>
 </head>
 <body>
-<h1>MaxChess</h1>
+<h1>Chess</h1>
 <div class="sub">Human vs. Computer</div>
 <div class="wrap">
 
@@ -183,6 +189,7 @@ h1{font-size:clamp(1.3rem,3vw,1.9rem);font-weight:400;letter-spacing:.35em;text-
   <button class="btn" onclick="newGame()">New Game</button>
 </div>
 
+<!-- BOARD + EVAL BAR -->
 <div style="display:flex;align-items:flex-start;gap:0;">
 <div class="bc" id="board-container">
   <div class="coord-files" id="coord-top"></div>
@@ -202,7 +209,7 @@ h1{font-size:clamp(1.3rem,3vw,1.9rem);font-weight:400;letter-spacing:.35em;text-
 </div>
 </div>
 
-</div>
+</div><!-- end .wrap -->
 
 <div class="mbg" id="pmodal">
   <div class="modal">
@@ -216,6 +223,7 @@ h1{font-size:clamp(1.3rem,3vw,1.9rem);font-weight:400;letter-spacing:.35em;text-
 </div>
 
 <script>
+// ===== CONFIG =====
 var PC = { w: '#f0e6cc', b: '#1a1a1a' };
 var depth = 1;
 var prevEval = 0;
@@ -230,12 +238,14 @@ function dismissBanner() {
 function showBlunderBanner() {
   var b = document.getElementById('blunder-banner');
   b.classList.remove('show');
+  // Force reflow so animation replays
   void b.offsetWidth;
   b.classList.add('show');
   if (bannerTimer) clearTimeout(bannerTimer);
   bannerTimer = setTimeout(dismissBanner, 3500);
 }
 
+// ===== PIECE SVG =====
 function luma(hex) {
   var r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
   return (0.299*r + 0.587*g + 0.114*b) / 255;
@@ -286,6 +296,7 @@ function makeSVG(type, cl, size) {
     '</g>' + '</svg>';
 
   if (type === 'N') {
+    // Clean single closed-path knight silhouette
     return '<svg ' + sizeAttr + ' viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg">' +
       '<g fill="' + f + '" stroke="' + s + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
       '<path d="M 22,10 C 32.5,11 38.5,18 38,39 L 15,39 C 15,30 25,32.5 23,18" />' +
@@ -321,6 +332,7 @@ function setPColor(cl, val) {
   updateIcons();
 }
 
+// ===== THEMES =====
 var THEMES = [
   {n:'Classic', l:'#f0d9b5',d:'#b58863',ll:'#cdd16f',ld:'#aaa23a',sl:'#f6f669',sd:'#bfbf2f'},
   {n:'Marine',  l:'#dee3e6',d:'#8ca2ad',ll:'#b0d4e8',ld:'#6fa0b8',sl:'#e8f4a0',sd:'#b0c840'},
@@ -353,6 +365,7 @@ function buildThemes() {
   });
 }
 
+// ===== CHESS ENGINE =====
 var FLS = 'abcdefgh', RNK = '87654321';
 var board, turn, sel, vMoves, lastM, over, cast, ep, capW, capB, hist;
 
@@ -462,6 +475,7 @@ function allLegal(b, cl, ep2, ca) {
   return mv;
 }
 
+// ===== AI =====
 var PV={P:100,N:320,B:330,R:500,Q:900,K:20000};
 var PTbl=[[0,0,0,0,0,0,0,0],[50,50,50,50,50,50,50,50],[10,10,20,30,30,20,10,10],[5,5,10,25,25,10,5,5],[0,0,0,20,20,0,0,0],[5,-5,-10,0,0,-10,-5,5],[5,10,10,-20,-20,10,10,5],[0,0,0,0,0,0,0,0]];
 var NTbl=[[-50,-40,-30,-30,-30,-30,-40,-50],[-40,-20,0,0,0,0,-20,-40],[-30,0,10,15,15,10,0,-30],[-30,5,15,20,20,15,5,-30],[-30,0,15,20,20,15,0,-30],[-30,5,10,15,15,10,5,-30],[-40,-20,0,5,5,0,-20,-40],[-50,-40,-30,-30,-30,-30,-40,-50]];
@@ -505,9 +519,12 @@ function bestMove() {
   return bm[Math.floor(Math.random()*bm.length)];
 }
 
+// ===== RENDER =====
 function renderBoard() {
   var el = document.getElementById('board');
   el.innerHTML = '';
+
+  // Coords
   var files = 'abcdefgh'.split('');
   var ranks = '87654321'.split('');
   var fHtml = files.map(function(f){return '<span>'+f+'</span>';}).join('');
@@ -516,6 +533,7 @@ function renderBoard() {
   document.getElementById('coord-bot').innerHTML = fHtml;
   document.getElementById('coord-left').innerHTML = rHtml;
   document.getElementById('coord-right').innerHTML = rHtml;
+
   var k = findK(board, turn);
   for (var r = 0; r < 8; r++) {
     for (var c = 0; c < 8; c++) {
@@ -538,6 +556,7 @@ function renderBoard() {
       el.appendChild(div);
     }
   }
+
   document.getElementById('wcp').style.background = PC.w;
   document.getElementById('bcp').style.background = PC.b;
 }
@@ -555,57 +574,77 @@ function onClick(r, c) {
   renderBoard();
 }
 
-var drag = null;
+// ===== DRAG AND DROP =====
+var drag = null; // {r, c, ghost, offsetX, offsetY}
 
 function onDragStart(e, r, c) {
   if (over || turn !== 'w') return;
   if (!board[r][c] || col(board[r][c]) !== 'w') return;
-  e.preventDefault();
-  sel = [r, c];
-  vMoves = legal(board, r, c, ep, cast);
-  renderBoard();
-  var ghost = document.createElement('div');
-  ghost.style.cssText = 'position:fixed;pointer-events:none;z-index:1000;width:64px;height:64px;display:flex;align-items:center;justify-content:center;opacity:0.9;';
-  ghost.innerHTML = makeSVG(board[r][c][1], board[r][c][0], '58');
-  document.body.appendChild(ghost);
+  e.preventDefault(); // suppress browser drag & click event for white pieces
+
+  var startX = e.clientX, startY = e.clientY;
+  var isDragging = false;
+  var ghost = null;
   var origSq = document.querySelectorAll('.sq')[r*8+c];
-  if (origSq) origSq.style.opacity = '0.25';
-  ghost.style.left = (e.clientX - 32) + 'px';
-  ghost.style.top  = (e.clientY - 32) + 'px';
-  drag = { r: r, c: c, ghost: ghost, origSq: origSq };
+
+  function startDrag() {
+    isDragging = true;
+    sel = [r, c];
+    vMoves = legal(board, r, c, ep, cast);
+    renderBoard();
+    ghost = document.createElement('div');
+    ghost.style.cssText = 'position:fixed;pointer-events:none;z-index:1000;width:64px;height:64px;display:flex;align-items:center;justify-content:center;opacity:0.9;';
+    ghost.innerHTML = makeSVG(board[r][c][1], board[r][c][0], '58');
+    document.body.appendChild(ghost);
+    if (origSq) origSq.style.opacity = '0.25';
+  }
+
   function onMouseMove(ev) {
-    ghost.style.left = (ev.clientX - 32) + 'px';
-    ghost.style.top  = (ev.clientY - 32) + 'px';
-    document.querySelectorAll('.sq.drag-over').forEach(function(s){ s.classList.remove('drag-over'); });
-    var target = getSquareFromPoint(ev.clientX, ev.clientY);
-    if (target) {
-      var tSq = document.querySelectorAll('.sq')[target.r*8+target.c];
-      if (tSq) tSq.classList.add('drag-over');
+    var dx = ev.clientX - startX, dy = ev.clientY - startY;
+    if (!isDragging && dx*dx + dy*dy > 25) startDrag(); // 5px threshold
+    if (isDragging && ghost) {
+      ghost.style.left = (ev.clientX - 32) + 'px';
+      ghost.style.top  = (ev.clientY - 32) + 'px';
+      document.querySelectorAll('.sq.drag-over').forEach(function(s){ s.classList.remove('drag-over'); });
+      var target = getSquareFromPoint(ev.clientX, ev.clientY);
+      if (target) {
+        var tSq = document.querySelectorAll('.sq')[target.r*8+target.c];
+        if (tSq) tSq.classList.add('drag-over');
+      }
     }
   }
+
   function onMouseUp(ev) {
     document.removeEventListener('mousemove', onMouseMove);
     document.removeEventListener('mouseup', onMouseUp);
-    ghost.remove();
+    if (ghost) { ghost.remove(); ghost = null; }
     document.querySelectorAll('.sq.drag-over').forEach(function(s){ s.classList.remove('drag-over'); });
     if (origSq) origSq.style.opacity = '';
-    var target = getSquareFromPoint(ev.clientX, ev.clientY);
-    if (target) {
-      var m = null;
-      for (var i = 0; i < vMoves.length; i++) {
-        if (vMoves[i].r === target.r && vMoves[i].c === target.c) { m = vMoves[i]; break; }
+
+    if (isDragging) {
+      var target = getSquareFromPoint(ev.clientX, ev.clientY);
+      if (target) {
+        var m = null;
+        for (var i = 0; i < vMoves.length; i++) {
+          if (vMoves[i].r === target.r && vMoves[i].c === target.c) { m = vMoves[i]; break; }
+        }
+        if (m) { sel = null; vMoves = []; doExec('w', r, c, target.r, target.c, m); return; }
       }
-      if (m) { sel = null; vMoves = []; doExec('w', r, c, target.r, target.c, m); return; }
+      if (!target || (target.r === r && target.c === c)) { sel = null; vMoves = []; }
+      renderBoard();
+    } else {
+      // No drag movement — treat as a click
+      onClick(r, c);
     }
-    if (!target || (target.r === r && target.c === c)) { sel = null; vMoves = []; }
-    renderBoard();
     drag = null;
   }
+
   document.addEventListener('mousemove', onMouseMove);
   document.addEventListener('mouseup', onMouseUp);
 }
 
 function getSquareFromPoint(x, y) {
+  // Temporarily hide ghost so elementFromPoint works
   var boardEl = document.getElementById('board');
   var rect = boardEl.getBoundingClientRect();
   if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return null;
@@ -614,6 +653,7 @@ function getSquareFromPoint(x, y) {
   if (r < 0 || r > 7 || c < 0 || c > 7) return null;
   return { r: r, c: c };
 }
+
 
 function doExec(cl, fr, fc, tr, tc, m) {
   if (pt(board[fr][fc])==='P' && (tr===0||tr===7) && cl==='w') { pendP={fr:fr,fc:fc,tr:tr,tc:tc,m:m}; showPromo(cl); return; }
@@ -671,7 +711,9 @@ function updateUI() {
 }
 
 function updateEval(movedColor) {
+  // Run a quick depth-1 eval from white's perspective
   var raw = evalB(board);
+  // Also peek one ply ahead for the side to move
   var mvs = allLegal(board, turn, ep, cast);
   var best = turn === 'w' ? -Infinity : Infinity;
   for (var i = 0; i < mvs.length; i++) {
@@ -683,12 +725,17 @@ function updateEval(movedColor) {
   }
   var score = mvs.length ? best : raw;
   var pawns = score / 100;
+
+  // Check for blunder: did the move swing >= 2 pawns in opponent's favor?
   if (movedColor) {
     var swing = pawns - prevEval;
-    var badForMover = (movedColor === 'w' && swing <= -2) || (movedColor === 'b' && swing >= 2);
+    // If white moved and eval dropped by 2+ => bad for white
+    // If black moved and eval rose by 2+ => bad for black
+    var badForMover = (movedColor === 'w' && swing <= -6) || (movedColor === 'b' && swing >= 6);
     if (badForMover) showBlunderBanner();
   }
   prevEval = pawns;
+
   var label = pawns === 0 ? '0.0' : (pawns > 0 ? '+' : '') + pawns.toFixed(1);
   var clamped = Math.max(-10, Math.min(10, pawns));
   var whitePct = 50 + (clamped / 10) * 50;
