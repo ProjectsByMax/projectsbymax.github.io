@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Soccer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a0a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Courier New', monospace;
+    user-select: none;
+  }
+  .scoreboard {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    margin-bottom: 14px;
+  }
+  .player-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.55rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #444;
+  }
+  .player-dot { width: 11px; height: 11px; border-radius: 50%; }
+  .score-display {
+    font-size: 2rem;
+    color: #bbb;
+    letter-spacing: 0.3em;
+    min-width: 80px;
+    text-align: center;
+  }
+  canvas { display: block; }
+  .controls {
+    margin-top: 12px;
+    font-size: 0.5rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #2e2e2e;
+  }
+  .msg {
+    font-size: 0.55rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #555;
+    margin-top: 6px;
+    min-height: 14px;
+    text-align: center;
+  }
+  .diff-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .diff-btn {
+    font-family: 'Courier New', monospace;
+    font-size: 0.45rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    background: none;
+    border: 1px solid #282828;
+    color: #383838;
+    padding: 4px 14px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .diff-btn:hover { border-color: #555; color: #666; }
+  .diff-btn.active { border-color: #777; color: #aaa; }
+</style>
+</head>
+<body>
+
+<div class="scoreboard">
+  <div class="player-label">
+    <div class="player-dot" style="background:#181818;box-shadow:0 0 0 1px #444;"></div>
+    <span>Computer</span>
+  </div>
+  <div class="score-display" id="score">0 — 0</div>
+  <div class="player-label">
+    <div class="player-dot" style="background:#f0f0f0;box-shadow:0 0 0 1px #444;"></div>
+    <span>You</span>
+  </div>
+</div>
+
+<div class="diff-bar">
+  <button class="diff-btn" id="btn-easy" onclick="setDiff('easy')">Easy</button>
+  <button class="diff-btn active" id="btn-medium" onclick="setDiff('medium')">Medium</button>
+  <button class="diff-btn" id="btn-hard" onclick="setDiff('hard')">Hard</button>
+</div>
+<canvas id="c"></canvas>
+<div class="msg" id="msg">press space to start</div>
+<div class="controls">Arrow keys to move</div>
+
+<script>
+// ── Canvas ──
+var CW = 820, CH = 590;
+var canvas = document.getElementById('c');
+var ctx = canvas.getContext('2d');
+canvas.width = CW;
+canvas.height = CH;
+
+// ── Field ──
+var CROWD = 72;
+var FX = CROWD, FY = 26;
+var FW = CW - CROWD*2, FH = CH - 52;
+var CX = CW/2, CY = CH/2;
+var GOAL_W = 140, GOAL_DEPTH = 22;
+var GL = CX - GOAL_W/2, GR = CX + GOAL_W/2;
+
+// Goal box dimensions (shared — used for goalie detection + drawing)
+var GA_W = 160, GA_H = 50;
+
+// ── Players ──
+var PR = 36, SPEED = 4.0;
+// White = bottom, Black = top
+var pW = { x: CX, y: FY + FH*0.78, r: PR, col: '#f0f0f0', stroke: 'rgba(0,0,0,0.4)'  };
+var pB = { x: CX, y: FY + FH*0.22, r: PR, col: '#181818', stroke: 'rgba(255,255,255,0.15)' };
+
+// ── Ball ──
+var BR = 9;
+var ball = { x: CX, y: CY, vx: 0, vy: 0 };
+
+// ── Difficulty ──
+var DIFF = {
+  easy:   { speed: 1.6, look: 2 },
+  medium: { speed: 3.0, look: 7 },
+  hard:   { speed: 4.8, look: 16 }
+};
+var diffLevel = 'medium';
+
+// ── State ──
+var scoreW = 0, scoreB = 0;
+var keys = {};
+var running = false;
+var flashTimer = 0, flashSide = '';
+var heldBy = null;   // pW or pB when goalie holds ball
+var heldTimer = 0;   // AI auto-throw countdown
+
+// ── Pre-generate crowd ──
+var crowdDots = [];
+var JERSEY_COLORS = [
+  'rgba(190,50,50,0.9)',    // red
+  'rgba(50,80,190,0.9)',    // blue
+  'rgba(200,150,40,0.9)',   // yellow
+  'rgba(50,140,80,0.9)',    // green
+  'rgba(180,80,180,0.9)',   // purple
+  'rgba(220,220,220,0.8)',  // white
+];
+(function() {
+  var rows = 7, rowSpacing = 10.5;
+  ['left','right'].forEach(function(side) {
+    for (var col = 0; col < rows; col++) {
+      var x = side === 'left'
+        ? FX - 8 - col * rowSpacing
+        : FX + FW + 8 + col * rowSpacing;
+      var r = 4.2 - col * 0.28;
+      var personSpacing = 9;
+      for (var py = FY + 4; py < FY + FH - 4; py += personSpacing) {
+        var jx = (Math.random() - 0.5) * 2.5;
+        var jy = (Math.random() - 0.5) * 2.5;
+        var color;
+        var rnd = Math.random();
+        if (rnd < 0.12) {
+          color = JERSEY_COLORS[Math.floor(Math.random() * JERSEY_COLORS.length)];
+        } else {
+          var shade = 18 + Math.floor(Math.random() * 28);
+          color = 'rgb('+shade+','+shade+','+shade+')';
+        }
+        crowdDots.push({ x: x+jx, y: py+jy, r: Math.max(r, 1.8), color: color });
+      }
+    }
+  });
+})();
+
+// ── Input ──
+window.addEventListener('keydown', function(e) {
+  keys[e.key] = true;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+  if (e.key === ' ') {
+    if (heldBy === pW) throwBall(pW);
+    else if (!running && !heldBy) launch();
+  }
+});
+window.addEventListener('keyup', function(e) { keys[e.key] = false; });
+
+function launch() {
+  running = true;
+  document.getElementById('msg').textContent = '';
+  var angle = (Math.random() - 0.5) * 0.7;
+  var dir = Math.random() < 0.5 ? 1 : -1;
+  var spd = 2.2;
+  ball.vx = Math.sin(angle) * spd;
+  ball.vy = Math.cos(angle) * spd * dir;
+}
+
+function resetBall() {
+  ball.x = CX; ball.y = CY;
+  ball.vx = 0; ball.vy = 0;
+  running = false; heldBy = null; heldTimer = 0;
+  setTimeout(function() {
+    document.getElementById('msg').textContent = 'press space to start';
+  }, 700);
+}
+
+function throwBall(p) {
+  var dir = p.y > CY ? -1 : 1; // white throws up, black throws down
+  var angle = (Math.random() - 0.5) * 0.5;
+  var spd = 2.8;
+  ball.vx = Math.sin(angle) * spd;
+  ball.vy = dir * Math.cos(angle) * spd;
+  heldBy = null; heldTimer = 0;
+  running = true;
+  document.getElementById('msg').textContent = '';
+}
+
+// ── AI (Black, top half) ──
+function updateAI() {
+  // AI goalie auto-throws after holding ~1.2s
+  if (heldBy === pB) {
+    heldTimer++;
+    if (heldTimer > 72) throwBall(pB);
+    return;
+  }
+
+  var cfg = DIFF[diffLevel];
+  var lookAhead = cfg.look;
+  var aiSpd = cfg.speed;
+
+  var targetX = ball.x + ball.vx * lookAhead;
+  targetX = clamp(targetX, FX + PR, FX + FW - PR);
+
+  var targetY;
+  if (ball.vy < 0) {
+    // Ball coming toward black — intercept aggressively
+    var predictY = ball.y + ball.vy * lookAhead;
+    targetY = clamp(predictY - 10, FY + PR, CY - PR);
+  } else {
+    // Ball going away — retreat toward own goal position
+    targetY = FY + FH * 0.15;
+    targetX = clamp(ball.x * 0.4 + CX * 0.6, FX + PR, FX + FW - PR);
+  }
+
+  var dx = targetX - pB.x, dy = targetY - pB.y;
+  var dist = Math.sqrt(dx*dx + dy*dy);
+  if (dist > 1) {
+    pB.x += (dx/dist) * Math.min(aiSpd, dist);
+    pB.y += (dy/dist) * Math.min(aiSpd, dist);
+  }
+  pB.x = clamp(pB.x, FX + PR, FX + FW - PR);
+  pB.y = clamp(pB.y, FY + PR, CY - PR);
+}
+
+// ── Player (White, bottom half, arrow keys) ──
+function updatePlayer() {
+  if (keys['ArrowUp'])    pW.y -= SPEED;
+  if (keys['ArrowDown'])  pW.y += SPEED;
+  if (keys['ArrowLeft'])  pW.x -= SPEED;
+  if (keys['ArrowRight']) pW.x += SPEED;
+  pW.x = clamp(pW.x, FX + PR, FX + FW - PR);
+  pW.y = clamp(pW.y, CY + PR, FY + FH - PR);
+}
+
+// ── Ball physics ──
+function updateBall() {
+  // Ball held by goalie — stick to front of player
+  if (heldBy) {
+    var headDY = heldBy.y > CY ? -20 : 20;
+    ball.x = heldBy.x;
+    ball.y = heldBy.y + headDY;
+    return;
+  }
+  if (!running) return;
+  ball.x += ball.vx;
+  ball.y += ball.vy;
+
+  // Side walls
+  if (ball.x - BR < FX)      { ball.x = FX + BR;      ball.vx =  Math.abs(ball.vx); }
+  if (ball.x + BR > FX + FW) { ball.x = FX + FW - BR; ball.vx = -Math.abs(ball.vx); }
+
+  // Top wall / Black's goal
+  if (ball.y - BR < FY) {
+    if (ball.x >= GL && ball.x <= GR) {
+      scoreW++; flashSide = 'top'; flashTimer = 55;
+      updateScore(); resetBall();
+    } else {
+      ball.y = FY + BR; ball.vy = Math.abs(ball.vy);
+    }
+  }
+
+  // Bottom wall / White's goal
+  if (ball.y + BR > FY + FH) {
+    if (ball.x >= GL && ball.x <= GR) {
+      scoreB++; flashSide = 'bottom'; flashTimer = 55;
+      updateScore(); resetBall();
+    } else {
+      ball.y = FY + FH - BR; ball.vy = -Math.abs(ball.vy);
+    }
+  }
+
+  hitPlayer(pW);
+  hitPlayer(pB);
+
+  // Speed cap
+  var spd = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
+  if (spd > 7) { ball.vx = ball.vx/spd*7; ball.vy = ball.vy/spd*7; }
+}
+
+function hitPlayer(p) {
+  if (heldBy) return;
+  var dx = ball.x - p.x, dy = ball.y - p.y;
+  var dist = Math.sqrt(dx*dx + dy*dy);
+  var min = BR + p.r;
+  if (dist < min && dist > 0) {
+    if (inGoalBox(p)) {
+      // Goalie catches it
+      heldBy = p;
+      heldTimer = 0;
+      running = false;
+      ball.vx = 0; ball.vy = 0;
+      if (p === pW) document.getElementById('msg').textContent = 'press space to throw';
+      return;
+    }
+    var nx = dx/dist, ny = dy/dist;
+    var dot = ball.vx*nx + ball.vy*ny;
+    ball.vx -= 2*dot*nx;
+    ball.vy -= 2*dot*ny;
+    var spd = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
+    var nspd = Math.min(Math.max(spd, 2.2) * 1.05, 7);
+    ball.vx = ball.vx/spd*nspd;
+    ball.vy = ball.vy/spd*nspd;
+    ball.x = p.x + nx*(min+1);
+    ball.y = p.y + ny*(min+1);
+  }
+}
+
+function setDiff(level) {
+  diffLevel = level;
+  ['easy','medium','hard'].forEach(function(l) {
+    document.getElementById('btn-'+l).classList.toggle('active', l === level);
+  });
+}
+
+function clamp(v, mn, mx) { return Math.max(mn, Math.min(mx, v)); }
+function updateScore() {
+  document.getElementById('score').textContent = scoreB + ' — ' + scoreW;
+}
+
+// ── Draw ──
+function drawCrowd() {
+  // Tiered stands — gradient from outer dark to inner slightly lighter
+  var lgL = ctx.createLinearGradient(0, 0, FX, 0);
+  lgL.addColorStop(0, '#0d0d0d');
+  lgL.addColorStop(1, '#1d1d1d');
+  ctx.fillStyle = lgL;
+  ctx.fillRect(0, 0, FX, CH);
+
+  var lgR = ctx.createLinearGradient(FX+FW, 0, CW, 0);
+  lgR.addColorStop(0, '#1d1d1d');
+  lgR.addColorStop(1, '#0d0d0d');
+  ctx.fillStyle = lgR;
+  ctx.fillRect(FX+FW, 0, CROWD, CH);
+
+  // Subtle row bands (stadium tier lines)
+  ctx.strokeStyle = 'rgba(255,255,255,0.025)';
+  ctx.lineWidth = 1;
+  for (var row = 0; row < 7; row++) {
+    var rx = FX - 8 - row * 10.5;
+    ctx.beginPath(); ctx.moveTo(rx, FY); ctx.lineTo(rx, FY+FH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(CW - rx, FY); ctx.lineTo(CW - rx, FY+FH); ctx.stroke();
+  }
+
+  for (var i = 0; i < crowdDots.length; i++) {
+    var d = crowdDots[i];
+    ctx.beginPath();
+    ctx.arc(d.x, d.y, d.r, 0, Math.PI*2);
+    ctx.fillStyle = d.color;
+    ctx.fill();
+  }
+}
+
+function drawField() {
+  // Stripes
+  var stripeH = FH / 9;
+  for (var i = 0; i < 9; i++) {
+    ctx.fillStyle = i%2===0 ? '#4e8b5d' : '#497f58';
+    ctx.fillRect(FX, FY + i*stripeH, FW, stripeH);
+  }
+
+  // Stadium floodlight glow — brighter center
+  var glow = ctx.createRadialGradient(CX, CY, 0, CX, CY, FH * 0.65);
+  glow.addColorStop(0, 'rgba(255,255,230,0.07)');
+  glow.addColorStop(0.6, 'rgba(255,255,230,0.02)');
+  glow.addColorStop(1, 'rgba(0,0,0,0.14)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(FX, FY, FW, FH);
+
+  // Goal area boxes
+  ctx.fillStyle = 'rgba(0,0,0,0.1)';
+  ctx.fillRect(CX - GA_W/2, FY, GA_W, GA_H);
+  ctx.fillRect(CX - GA_W/2, FY + FH - GA_H, GA_W, GA_H);
+
+  // Penalty spots
+  ctx.fillStyle = 'rgba(255,255,255,0.2)';
+  ctx.beginPath(); ctx.arc(CX, FY + 72, 2.5, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(CX, FY + FH - 72, 2.5, 0, Math.PI*2); ctx.fill();
+
+  // Lines
+  ctx.strokeStyle = 'rgba(200,200,200,0.2)';
+  ctx.lineWidth = 1.2;
+
+  // Center circle
+  ctx.beginPath(); ctx.arc(CX, CY, 54, 0, Math.PI*2); ctx.stroke();
+
+  // Center dot
+  ctx.fillStyle = 'rgba(200,200,200,0.2)';
+  ctx.beginPath(); ctx.arc(CX, CY, 2.5, 0, Math.PI*2); ctx.fill();
+
+  // Center line
+  ctx.beginPath(); ctx.moveTo(FX, CY); ctx.lineTo(FX+FW, CY); ctx.stroke();
+
+  // Goal area outlines
+  ctx.strokeRect(CX - GA_W/2, FY, GA_W, GA_H);
+  ctx.strokeRect(CX - GA_W/2, FY + FH - GA_H, GA_W, GA_H);
+
+  // Field border with goal gaps
+  ctx.strokeStyle = 'rgba(210,210,210,0.3)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(FX, FY); ctx.lineTo(GL, FY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(GR, FY); ctx.lineTo(FX+FW, FY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(FX, FY+FH); ctx.lineTo(GL, FY+FH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(GR, FY+FH); ctx.lineTo(FX+FW, FY+FH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(FX, FY); ctx.lineTo(FX, FY+FH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(FX+FW, FY); ctx.lineTo(FX+FW, FY+FH); ctx.stroke();
+
+  // Goal nets
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(GL, FY - GOAL_DEPTH, GOAL_W, GOAL_DEPTH);
+  ctx.fillRect(GL, FY + FH, GOAL_W, GOAL_DEPTH);
+  ctx.strokeStyle = 'rgba(180,180,180,0.35)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(GL, FY - GOAL_DEPTH, GOAL_W, GOAL_DEPTH);
+  ctx.strokeRect(GL, FY + FH, GOAL_W, GOAL_DEPTH);
+
+  // Goal flash
+  if (flashTimer > 0) {
+    var alpha = (flashTimer / 55) * 0.2;
+    ctx.fillStyle = 'rgba(255,255,255,' + alpha + ')';
+    if (flashSide === 'top')    ctx.fillRect(GL, FY - GOAL_DEPTH, GOAL_W, GOAL_DEPTH + 60);
+    if (flashSide === 'bottom') ctx.fillRect(GL, FY + FH - 60, GOAL_W, 60 + GOAL_DEPTH);
+    flashTimer--;
+  }
+}
+
+function inGoalBox(p) {
+  var inX = p.x >= CX - GA_W/2 && p.x <= CX + GA_W/2;
+  if (p.y > CY) return inX && p.y >= FY + FH - GA_H; // white — bottom box
+  return inX && p.y <= FY + GA_H;                     // black — top box
+}
+
+function drawPlayer(p) {
+  var headDY = p.y > CY ? -20 : 20;
+  var bodyDY  = headDY * -0.2;
+  var isGoalie = inGoalBox(p) || heldBy === p;
+  var fillCol   = isGoalie ? '#c0222a' : p.col;
+  var sCol      = isGoalie ? 'rgba(255,100,100,0.5)' : p.stroke;
+
+  ctx.save();
+  ctx.translate(p.x, p.y);
+
+  // Shadow
+  ctx.beginPath();
+  ctx.ellipse(3, 6, 26, 18, 0, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.fill();
+
+  // Body
+  ctx.beginPath();
+  ctx.ellipse(0, bodyDY, 26, 22, 0, 0, Math.PI*2);
+  ctx.fillStyle = fillCol;
+  ctx.fill();
+  ctx.strokeStyle = sCol;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Head
+  ctx.beginPath();
+  ctx.arc(0, headDY, 13, 0, Math.PI*2);
+  ctx.fillStyle = fillCol;
+  ctx.fill();
+  ctx.strokeStyle = sCol;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawBall() {
+  ctx.beginPath();
+  ctx.arc(ball.x + 2, ball.y + 3, BR, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, BR, 0, Math.PI*2);
+  ctx.fillStyle = '#f5f5f5';
+  ctx.fill();
+  ctx.strokeStyle = '#bbb';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+}
+
+// ── Loop ──
+function frame() {
+  updatePlayer();
+  updateAI();
+  updateBall();
+
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(0, 0, CW, CH);
+
+  drawCrowd();
+  drawField();
+  drawPlayer(pW);
+  drawPlayer(pB);
+  drawBall();
+
+  requestAnimationFrame(frame);
+}
+
+frame();
+</script>
+</body>
+</html>
