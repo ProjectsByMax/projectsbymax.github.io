@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Atlantis Progress">
+  <meta name="apple-mobile-web-app-title" content="Mizner Storall">
   <meta name="theme-color" content="#3B82F6">
-  <title>Atlantis Progress</title>
+  <title>Mizner Storall of Atlantis</title>
   <link rel="manifest" href="manifest.json">
   <style>
     :root {
@@ -69,7 +69,8 @@
       padding: calc(14px + var(--safe-top)) 18px 0; flex-shrink: 0;
     }
     .header-row  { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-    .header-title { color: #fff; font-size: 20px; font-weight: 800; letter-spacing: -.5px; }
+    .header-title { color: #fff; font-size: 20px; font-weight: 800; letter-spacing: -.5px; text-decoration: none; display: inline-block; }
+    .header-title:active { opacity: .75; }
     .header-sub   { color: rgba(255,255,255,.5); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .3px; margin-top: 2px; }
     .pct-badge {
       background: rgba(255,255,255,.15); backdrop-filter: blur(8px);
@@ -86,7 +87,7 @@
     .tab-pane    { padding: 14px 12px calc(18px + var(--safe-bottom)); }
 
     /* ── SECTION CARD ── */
-    .section-card { background: var(--card); border-radius: 20px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(59,130,246,.07), 0 4px 16px rgba(59,130,246,.05); overflow: hidden; }
+    .section-card { background: var(--card); border-radius: 20px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(59,130,246,.07), 0 4px 16px rgba(59,130,246,.05); overflow: hidden; position: relative; padding-bottom: 30px; }
     .section-head { padding: 12px 14px 10px; border-bottom: 1px solid var(--soft); display: flex; align-items: center; gap: 10px; }
     .sec-icon     { width: 32px; height: 32px; border-radius: 10px; background: var(--blue-tint); display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
     .sec-text     { flex: 1; min-width: 0; }
@@ -111,7 +112,7 @@
       display: flex; align-items: center; justify-content: center;
       padding: 0 3px; border: 2px solid var(--card);
     }
-    .sec-badge { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 100px; background: var(--soft); color: var(--muted); }
+    .sec-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 100px; background: var(--soft); color: var(--muted); position: absolute; bottom: 10px; right: 12px; }
     .sec-badge.done { background: var(--green-tint); color: #047857; }
 
     /* ── ITEM ROWS ── */
@@ -173,9 +174,26 @@
     .step-chip.sel { background: var(--blue-tint); border-color: var(--blue); color: var(--blue); }
     .chip-num   { width: 18px; height: 18px; border-radius: 50%; background: var(--blue); color: #fff; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
-    /* plus button */
-    .plus-btn { width: 30px; height: 30px; border-radius: 9px; background: var(--blue-tint2); border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s; color: var(--blue); font-size: 18px; font-weight: 300; line-height: 1; }
-    .plus-btn:active { background: var(--blue-tint); }
+    /* plus + gear buttons */
+    .plus-btn, .gear-btn { width: 30px; height: 30px; border-radius: 9px; background: var(--blue-tint2); border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s; }
+    .plus-btn { color: var(--blue); font-size: 18px; font-weight: 300; line-height: 1; }
+    .plus-btn:active, .gear-btn:active { background: var(--blue-tint); }
+    .gear-btn svg { width: 15px; height: 15px; stroke: var(--muted); stroke-width: 2; fill: none; }
+    /* section delete button */
+    .sec-del-btn { width: 30px; height: 30px; border-radius: 9px; background: rgba(239,68,68,.08); border: 1.5px solid rgba(239,68,68,.2); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s; }
+    .sec-del-btn:active { background: rgba(239,68,68,.18); }
+    .sec-del-btn svg { width: 14px; height: 14px; stroke: var(--red); stroke-width: 2; fill: none; }
+    /* item gear button */
+    .item-actions { margin-left: auto; display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+    .item-gear-btn { background: none; border: none; color: var(--muted); cursor: pointer; padding: 2px 4px; border-radius: 6px; display: flex; align-items: center; transition: color .15s; }
+    .item-gear-btn:active { color: var(--blue); }
+    .item-gear-btn svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 2; fill: none; }
+    /* gear item block */
+    .gear-item-block { padding: 12px 0; border-bottom: 1px solid var(--soft); }
+    .gear-item-block:last-child { border-bottom: none; }
+    .gear-item-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .gear-name-inp { flex: 1; border: 1.5px solid var(--border); border-radius: 10px; padding: 8px 10px; font-size: 13px; font-family: inherit; color: var(--text); outline: none; transition: border-color .15s; }
+    .gear-name-inp:focus { border-color: var(--blue); }
 
     /* custom item delete */
     .item-del { background: none; border: none; color: var(--muted); font-size: 13px; cursor: pointer; padding: 4px 6px; border-radius: 6px; margin-left: auto; flex-shrink: 0; transition: color .15s; }
@@ -242,7 +260,7 @@
 
 <div id="pin-screen">
   <div class="pin-icon">🏗️</div>
-  <div class="pin-title">Atlantis Progress</div>
+  <div class="pin-title">Mizner Storall of Atlantis</div>
   <div class="pin-sub">Storage Facility Development</div>
   <div class="pin-dots">
     <div class="pin-dot" id="d0"></div><div class="pin-dot" id="d1"></div>
@@ -261,7 +279,7 @@
   <div class="app-header">
     <div class="header-row">
       <div>
-        <div class="header-title">Atlantis Progress</div>
+        <div class="header-title" onclick="switchTab('progress')" style="cursor:pointer">Mizner Storall of Atlantis</div>
         <div class="header-sub">Storage Facility Development</div>
       </div>
       <div class="pct-badge" id="pct-badge">0%</div>
@@ -296,6 +314,21 @@
 
 <div class="toast" id="toast"></div>
 <input type="file" id="file-input" style="display:none" multiple accept="image/*,application/pdf,.doc,.docx,.xlsx,.xls">
+
+<div class="modal-overlay hidden" id="gear-modal">
+  <div class="modal-card">
+    <div class="modal-title">Edit Item</div>
+    <div class="modal-sub">Name</div>
+    <input class="modal-input" id="gear-name-input" type="text" maxlength="60">
+    <div class="modal-sub" style="margin-top:14px;margin-bottom:8px">Steps (tap in order)</div>
+    <div class="chip-pool" id="gear-chip-pool"></div>
+    <div class="modal-btns" style="margin-top:14px">
+      <button class="modal-btn cancel" id="gear-cancel">Cancel</button>
+      <button class="modal-btn save"   id="gear-save">Save</button>
+    </div>
+    <button class="modal-btn del" id="gear-del-item" style="margin-top:10px;width:100%">Delete Item</button>
+  </div>
+</div>
 
 <div class="modal-overlay hidden" id="del-modal">
   <div class="modal-card">
@@ -427,8 +460,21 @@ let stepStates    = {};
 let attachments   = [];
 let activeTab     = 'progress';
 let uploadSection = null;
-let customItems   = JSON.parse(localStorage.getItem('ap_custom') || '[]');
-const allItems    = () => [...ITEMS, ...customItems];
+// Mutable state (localStorage-backed), migrates legacy ap_custom
+const _legacy     = JSON.parse(localStorage.getItem('ap_custom') || '[]');
+const _savedSec   = localStorage.getItem('ap_sections');
+const _savedItems = localStorage.getItem('ap_items');
+let activeSections = _savedSec
+  ? JSON.parse(_savedSec)
+  : SECTIONS.map(s => ({...s}));
+let activeItems = _savedItems
+  ? JSON.parse(_savedItems)
+  : [...ITEMS.map(i => ({...i, steps:[...i.steps]})), ..._legacy];
+const allItems = () => activeItems;
+function persistState() {
+  localStorage.setItem('ap_sections', JSON.stringify(activeSections));
+  localStorage.setItem('ap_items',    JSON.stringify(activeItems));
+}
 let addModalSection = null;
 
 // ── PIN ───────────────────────────────────────────────────────────
@@ -516,7 +562,7 @@ function renderProgress() {
   document.getElementById('pct-badge').textContent  = pct + '%';
 
   const el = document.getElementById('tab-progress');
-  el.innerHTML = SECTIONS.map(sec => {
+  el.innerHTML = activeSections.map(sec => {
     const items    = allItems().filter(i => i.section === sec.id);
     const secTotal = items.reduce((s,i) => s + realStepCount(i), 0);
     const secDone  = items.reduce((s,item) =>
@@ -538,13 +584,16 @@ function renderProgress() {
               <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
               ${atts>0?`<span class="clip-badge">${atts}</span>`:''}
             </button>
-            <span class="sec-badge ${full?'done':''}">${secDone}/${secTotal}</span>
           </div>
+          <span class="sec-badge ${full?'done':''}">${secDone}/${secTotal}</span>
         </div>
         <div class="items-wrap">${items.map(item => renderItem(item)).join('')}</div>
       </div>`;
   }).join('');
 
+  el.querySelectorAll('.item-gear-btn').forEach(btn =>
+    btn.addEventListener('click', () => openGearModal(btn.dataset.gearItem))
+  );
   el.querySelectorAll('.plus-btn').forEach(btn =>
     btn.addEventListener('click', () => openAddModal(btn.dataset.addSec))
   );
@@ -562,9 +611,6 @@ function renderProgress() {
         toggleStep(item, +step, false);
       }
     })
-  );
-  el.querySelectorAll('.item-del').forEach(btn =>
-    btn.addEventListener('click', () => deleteCustomItem(btn.dataset.id))
   );
 }
 
@@ -598,11 +644,14 @@ function renderItem(item) {
     </div>`;
   }).join('');
 
-  const delBtn = item.custom ? `<button class="item-del" data-id="${item.id}">✕</button>` : '';
+  const gearSVG = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>`;
   return `
     <div class="item-row${complete?' complete':''}">
       <div class="item-name ${complete?'done':''}">
-        ${complete ? '<span class="item-check">✓</span>' : ''}${item.name}${delBtn}
+        ${complete ? '<span class="item-check">✓</span>' : ''}<span>${item.name}</span>
+        <span class="item-actions">
+          <button class="item-gear-btn" data-gear-item="${item.id}">${gearSVG}</button>
+        </span>
       </div>
       <div class="hstep">${nodesHTML}</div>
     </div>`;
@@ -628,10 +677,24 @@ document.getElementById('file-input').addEventListener('change', async e => {
   ov.remove(); e.target.value = '';
 });
 
+const firebaseReady = () => FIREBASE_CONFIG.apiKey !== 'REPLACE_WITH_YOUR_API_KEY' && db && storage;
+
 async function uploadFile(file, secId) {
-  if (!db || !storage) { showToast('No database'); return; }
+  const ts = Date.now();
+  if (!firebaseReady()) {
+    // Local fallback — blob URL, lives for the session
+    const url = URL.createObjectURL(file);
+    attachments.unshift({
+      id: `local_${secId}_${ts}`, section: secId,
+      fileName: file.name, fileUrl: url, fileType: file.type,
+      storagePath: '', uploadedAt: { seconds: Math.floor(ts/1000) },
+      size: file.size, local: true,
+    });
+    renderProgress(); renderFiles();
+    showToast('✓ File attached');
+    return;
+  }
   try {
-    const ts   = Date.now();
     const safe = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
     const sRef = ref(storage, `attachments/${secId}/${ts}_${safe}`);
     const snap = await uploadBytes(sRef, file);
@@ -673,7 +736,7 @@ async function uploadFile(file, secId) {
 
 // ── RENDER: FILES ─────────────────────────────────────────────────
 function renderFiles() {
-  document.getElementById('tab-files').innerHTML = SECTIONS.map(sec => {
+  document.getElementById('tab-files').innerHTML = activeSections.map(sec => {
     const secFiles = attachments.filter(a => a.section === sec.id);
     return `
       <div class="fcard">
@@ -716,6 +779,14 @@ function fileRow(att) {
 
 async function deleteFile(id, path) {
   if (!confirm('Delete this file?')) return;
+  const att = attachments.find(a => a.id === id);
+  if (att?.local) {
+    URL.revokeObjectURL(att.fileUrl);
+    attachments = attachments.filter(a => a.id !== id);
+    renderProgress(); renderFiles();
+    showToast('File deleted');
+    return;
+  }
   try {
     await deleteDoc(doc(db,'attachments',id));
     if (path) await deleteObject(ref(storage,path)).catch(()=>{});
@@ -813,15 +884,14 @@ function saveNewItem() {
   if (!selectedSteps.length) { showToast('Pick at least one step'); return; }
   const name = document.getElementById('modal-input').value.trim();
   const id   = 'custom_' + Date.now();
-  const steps = d(selectedSteps);
-  customItems.push({ id, section: addModalSection, name, steps, custom: true });
-  localStorage.setItem('ap_custom', JSON.stringify(customItems));
+  activeItems.push({ id, section: addModalSection, name, steps: d(selectedSteps), custom: true });
+  persistState();
   closeAddModal();
   renderProgress(); renderFiles();
 }
 let pendingDelId = null;
 function deleteCustomItem(id) {
-  const item = customItems.find(i => i.id === id);
+  const item = activeItems.find(i => i.id === id);
   if (!item) return;
   pendingDelId = id;
   document.getElementById('del-name').textContent = `"${item.name}" will be permanently removed.`;
@@ -829,8 +899,14 @@ function deleteCustomItem(id) {
 }
 function confirmDelete() {
   if (!pendingDelId) return;
-  customItems = customItems.filter(i => i.id !== pendingDelId);
-  localStorage.setItem('ap_custom', JSON.stringify(customItems));
+  if (typeof pendingDelId === 'string' && pendingDelId.startsWith('sec:')) {
+    const secId = pendingDelId.slice(4);
+    activeSections = activeSections.filter(s => s.id !== secId);
+    activeItems    = activeItems.filter(i => i.section !== secId);
+  } else {
+    activeItems = activeItems.filter(i => i.id !== pendingDelId);
+  }
+  persistState();
   pendingDelId = null;
   document.getElementById('del-modal').classList.add('hidden');
   renderProgress(); renderFiles();
@@ -854,6 +930,66 @@ document.getElementById('modal-save').addEventListener('click', saveNewItem);
 document.getElementById('modal-input').addEventListener('keydown', e => { if (e.key === 'Enter') { if (!document.getElementById('modal-input').value.trim()) return; showModalPage(2); } if (e.key === 'Escape') closeAddModal(); });
 document.getElementById('add-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeAddModal(); });
 
+// ── GEAR MODAL ───────────────────────────────────────────────────
+let gearItemId    = null;
+let gearItemSteps = [];
+
+function openGearModal(itemId) {
+  gearItemId = itemId;
+  const item = activeItems.find(i => i.id === itemId);
+  if (!item) return;
+  document.getElementById('gear-name-input').value = item.name;
+  gearItemSteps = item.steps.slice(0, -1); // strip Job Done
+  renderGearChips();
+  document.getElementById('gear-modal').classList.remove('hidden');
+}
+function closeGearModal() {
+  document.getElementById('gear-modal').classList.add('hidden');
+  gearItemId = null;
+}
+function renderGearChips() {
+  const pool = document.getElementById('gear-chip-pool');
+  pool.innerHTML = STEP_POOL.map(step => {
+    const idx = gearItemSteps.indexOf(step);
+    const sel = idx !== -1;
+    return `<div class="step-chip ${sel?'sel':''}" data-gstep="${step}">
+      ${step}${sel?`<span class="chip-num">${idx+1}</span>`:''}
+    </div>`;
+  }).join('');
+  pool.querySelectorAll('.step-chip[data-gstep]').forEach(chip =>
+    chip.addEventListener('click', () => {
+      const s = chip.dataset.gstep;
+      const idx = gearItemSteps.indexOf(s);
+      if (idx !== -1) gearItemSteps.splice(idx, 1); else gearItemSteps.push(s);
+      renderGearChips();
+    })
+  );
+}
+function saveGearEdit() {
+  const item = activeItems.find(i => i.id === gearItemId);
+  if (!item) { closeGearModal(); return; }
+  const newName = document.getElementById('gear-name-input').value.trim();
+  if (newName) item.name = newName;
+  if (gearItemSteps.length) item.steps = d(gearItemSteps);
+  persistState();
+  closeGearModal();
+  renderProgress(); renderFiles();
+}
+
+document.getElementById('gear-cancel').addEventListener('click', closeGearModal);
+document.getElementById('gear-save').addEventListener('click', saveGearEdit);
+document.getElementById('gear-del-item').addEventListener('click', () => {
+  const item = activeItems.find(i => i.id === gearItemId);
+  if (!item) return;
+  pendingDelId = gearItemId;
+  document.getElementById('del-name').textContent = `"${item.name}" will be permanently removed.`;
+  closeGearModal();
+  document.getElementById('del-modal').classList.remove('hidden');
+});
+document.getElementById('gear-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeGearModal();
+});
+
 // ── TOAST ─────────────────────────────────────────────────────────
 let toastTimer;
 function showToast(msg) {
@@ -873,4 +1009,3 @@ renderFiles();
 </script>
 </body>
 </html>
-
