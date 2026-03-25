@@ -1,1 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Atlantis Progress">
+  <meta name="theme-color" content="#3B82F6">
+  <title>Atlantis Progress</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    :root {
+      --blue:       #3B82F6;
+      --blue-dark:  #1D4ED8;
+      --blue-tint:  rgba(59,130,246,0.10);
+      --blue-tint2: rgba(59,130,246,0.05);
+      --green:      #10B981;
+      --green-tint: rgba(16,185,129,0.12);
+      --red:        #EF4444;
+      --bg:         #EFF6FF;
+      --card:       #FFFFFF;
+      --text:       #0F172A;
+      --muted:      #64748B;
+      --border:     #E2E8F0;
+      --soft:       #F8FAFC;
+      --safe-top:    env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; overflow: hidden; }
+    .hidden { display: none !important; }
+
+    /* ── PIN ── */
+    #pin-screen {
+      position: fixed; inset: 0; z-index: 1000;
+      background: linear-gradient(160deg, #1E3A8A 0%, #3B82F6 100%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: calc(48px + var(--safe-top)) 24px 48px;
+    }
+    .pin-icon  { font-size: 52px; margin-bottom: 12px; filter: drop-shadow(0 4px 12px rgba(0,0,0,.25)); }
+    .pin-title { color: #fff; font-size: 28px; font-weight: 800; letter-spacing: -0.8px; }
+    .pin-sub   { color: rgba(255,255,255,.5); font-size: 13px; margin-top: 5px; margin-bottom: 44px; }
+    .pin-dots  { display: flex; gap: 18px; margin-bottom: 44px; }
+    .pin-dot   { width: 13px; height: 13px; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); background: transparent; transition: all .18s; }
+    .pin-dot.filled { background: #fff; border-color: #fff; transform: scale(1.1); }
+    .pin-dot.error  { background: var(--red); border-color: var(--red); }
+    .pin-keypad { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; width: 100%; max-width: 252px; }
+    .pin-key {
+      background: rgba(255,255,255,.12); backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,.18); border-radius: 16px;
+      color: #fff; font-size: 26px; font-weight: 300; height: 66px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      -webkit-user-select: none; user-select: none; transition: background .12s, transform .08s;
+    }
+    .pin-key:active { background: rgba(255,255,255,.28); transform: scale(.95); }
+    .pin-key.del   { font-size: 18px; }
+    .pin-key.blank { background: transparent; border-color: transparent; pointer-events: none; }
+    .pin-error { color: rgba(255,100,100,.9); font-size: 13px; margin-top: 16px; min-height: 18px; font-weight: 500; }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 18%{transform:translateX(-10px)} 36%{transform:translateX(10px)} 54%{transform:translateX(-7px)} 72%{transform:translateX(7px)} }
+    .shake { animation: shake .42s ease; }
+
+    /* ── APP SHELL ── */
+    #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+
+    /* ── HEADER ── */
+    .app-header {
+      background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);
+      padding: calc(14px + var(--safe-top)) 18px 0; flex-shrink: 0;
+    }
+    .header-row  { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .header-title { color: #fff; font-size: 20px; font-weight: 800; letter-spacing: -.5px; }
+    .header-sub   { color: rgba(255,255,255,.5); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .3px; margin-top: 2px; }
+    .pct-badge {
+      background: rgba(255,255,255,.15); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,.2); border-radius: 100px;
+      padding: 5px 12px; color: #fff; font-size: 12px; font-weight: 700;
+    }
+    .bar-wrap   { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%); padding: 0 18px 14px; flex-shrink: 0; }
+    .bar-track  { background: rgba(255,255,255,.2); border-radius: 100px; height: 4px; overflow: hidden; }
+    .bar-fill   { background: linear-gradient(90deg, #93C5FD, #34D399); height: 100%; border-radius: 100px; transition: width .6s cubic-bezier(.4,0,.2,1); }
+    .bar-label  { color: rgba(255,255,255,.5); font-size: 11px; margin-top: 5px; text-align: right; font-weight: 500; }
+
+    /* ── SCROLL ── */
+    .scroll-area { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .tab-pane    { padding: 14px 12px calc(18px + var(--safe-bottom)); }
+
+    /* ── SECTION CARD ── */
+    .section-card { background: var(--card); border-radius: 20px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(59,130,246,.07), 0 4px 16px rgba(59,130,246,.05); overflow: hidden; }
+    .section-head { padding: 12px 14px 10px; border-bottom: 1px solid var(--soft); display: flex; align-items: center; gap: 10px; }
+    .sec-icon     { width: 32px; height: 32px; border-radius: 10px; background: var(--blue-tint); display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+    .sec-text     { flex: 1; min-width: 0; }
+    .sec-title    { font-size: 14px; font-weight: 700; color: var(--text); letter-spacing: -.2px; }
+    .sec-prog     { font-size: 11px; color: var(--muted); margin-top: 1px; font-weight: 500; }
+    .sec-right    { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+
+    /* attach button */
+    .clip-btn {
+      width: 30px; height: 30px; border-radius: 9px;
+      background: var(--blue-tint2); border: 1.5px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; position: relative; transition: background .15s, border-color .15s;
+    }
+    .clip-btn:active { background: var(--blue-tint); }
+    .clip-btn svg    { width: 14px; height: 14px; stroke: var(--blue); stroke-width: 2.2; fill: none; }
+    .clip-btn.lit    { background: var(--blue-tint); border-color: var(--blue); }
+    .clip-badge {
+      position: absolute; top: -5px; right: -5px;
+      background: var(--blue); color: #fff; font-size: 9px; font-weight: 800;
+      min-width: 15px; height: 15px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0 3px; border: 2px solid var(--card);
+    }
+    .sec-badge { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 100px; background: var(--soft); color: var(--muted); }
+    .sec-badge.done { background: var(--green-tint); color: #047857; }
+
+    /* ── ITEM ROWS ── */
+    .items-wrap { padding: 6px 0 2px; }
+    .item-row   { padding: 10px 14px 11px; border-bottom: 1px solid var(--soft); transition: background .35s, border-color .35s; }
+    .item-row:last-child { border-bottom: none; }
+    .item-row.complete { background: rgba(16,185,129,0.07); border-left: 3px solid var(--green); padding-left: 11px; }
+    .item-name  { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 8px; letter-spacing: -.1px; display: flex; align-items: center; gap: 6px; }
+    .item-name.done { color: #047857; }
+    .item-check { color: var(--green); font-size: 14px; flex-shrink: 0; }
+
+    /* ── HORIZONTAL STEPPER ── */
+    .hstep { display: flex; align-items: flex-start; }
+    .hstep-col { display: flex; flex-direction: column; align-items: center; width: 52px; flex-shrink: 0; }
+    .hstep-node {
+      width: 34px; height: 34px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 800; flex-shrink: 0;
+      transition: all .2s cubic-bezier(.4,0,.2,1);
+    }
+    .hstep-node.done   { background: var(--green); color: #fff; box-shadow: 0 2px 8px rgba(16,185,129,.3); cursor: pointer; }
+    .hstep-node.done svg { width: 14px; height: 14px; stroke: #fff; stroke-width: 3; fill: none; }
+    .hstep-node.active { background: var(--blue); color: #fff; box-shadow: 0 2px 10px rgba(59,130,246,.35); cursor: pointer; }
+    .hstep-node.active:active { transform: scale(.88); }
+    .hstep-node.active.jobdone { background: var(--green); box-shadow: 0 2px 8px rgba(16,185,129,.35); }
+    .hstep-node.locked { background: var(--soft); border: 2px solid var(--border); color: var(--muted); cursor: default; }
+    .hstep-lbl  { font-size: 11px; font-weight: 500; color: var(--muted); text-align: center; margin-top: 5px; line-height: 1.25; width: 52px; word-break: break-word; }
+    .hstep-conn { flex: 1; height: 2px; background: var(--border); margin-top: 17px; border-radius: 2px; transition: background .3s; min-width: 4px; }
+    .hstep-conn.done { background: var(--green); }
+    /* ── BRIDGE SVG ── */
+    .bridge-wrap { flex: 1; display: flex; align-items: center; margin-top: 5px; min-width: 24px; }
+    .bridge-svg  { width: 100%; height: 24px; }
+    .bridge-svg line { stroke-linecap: round; stroke-linejoin: round; fill: none; stroke-width: 2.5; }
+    .bridge-svg .g-broken, .bridge-svg .g-fixed { transition: opacity .45s ease; }
+    .bridge-svg.broken .g-broken { opacity: 1; }
+    .bridge-svg.broken .g-fixed  { opacity: 0; }
+    .bridge-svg.fixed  .g-broken { opacity: 0; }
+    .bridge-svg.fixed  .g-fixed  { opacity: 1; }
+    .bridge-svg .g-broken line { stroke: #CBD5E1; }
+    .bridge-svg .g-fixed  line { stroke: var(--green); }
+
+    /* ── ADD ITEM MODAL ── */
+    .modal-overlay { position: fixed; inset: 0; z-index: 900; background: rgba(15,23,42,.45); backdrop-filter: blur(4px); display: flex; align-items: flex-end; justify-content: center; padding-bottom: var(--safe-bottom); }
+    .modal-card { background: var(--card); border-radius: 24px 24px 0 0; padding: 24px 20px 32px; width: 100%; max-width: 480px; box-shadow: 0 -8px 40px rgba(15,23,42,.15); }
+    .modal-title { font-size: 16px; font-weight: 800; color: var(--text); margin-bottom: 4px; letter-spacing: -.3px; }
+    .modal-sub   { font-size: 12px; color: var(--muted); margin-bottom: 14px; font-weight: 500; }
+    .modal-input { width: 100%; border: 1.5px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: 15px; font-family: inherit; color: var(--text); outline: none; transition: border-color .15s; }
+    .modal-input:focus { border-color: var(--blue); }
+    .modal-btns { display: flex; gap: 10px; margin-top: 14px; }
+    .modal-btn { flex: 1; padding: 12px; border-radius: 12px; border: none; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; transition: opacity .15s; }
+    .modal-btn:active { opacity: .75; }
+    .modal-btn.cancel { background: var(--soft); color: var(--muted); }
+    .modal-btn.save   { background: var(--blue); color: #fff; }
+    .modal-btn.del    { background: rgba(239,68,68,.1); color: var(--red); }
+    .modal-page { }
+    /* Step chips */
+    .chip-pool  { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; max-height: 220px; overflow-y: auto; }
+    .step-chip  { padding: 8px 13px; border-radius: 100px; background: var(--soft); border: 1.5px solid var(--border); font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 6px; -webkit-user-select: none; user-select: none; }
+    .step-chip.sel { background: var(--blue-tint); border-color: var(--blue); color: var(--blue); }
+    .chip-num   { width: 18px; height: 18px; border-radius: 50%; background: var(--blue); color: #fff; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+    /* plus button */
+    .plus-btn { width: 30px; height: 30px; border-radius: 9px; background: var(--blue-tint2); border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s; color: var(--blue); font-size: 18px; font-weight: 300; line-height: 1; }
+    .plus-btn:active { background: var(--blue-tint); }
+
+    /* custom item delete */
+    .item-del { background: none; border: none; color: var(--muted); font-size: 13px; cursor: pointer; padding: 4px 6px; border-radius: 6px; margin-left: auto; flex-shrink: 0; transition: color .15s; }
+    .item-del:active { color: var(--red); }
+
+    /* ── INFO TAB ── */
+    .city-card { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%); border-radius: 20px; padding: 20px; margin-bottom: 12px; box-shadow: 0 4px 20px rgba(30,58,138,.2); }
+    .city-card h2    { color: #fff; font-size: 19px; font-weight: 800; letter-spacing: -.4px; }
+    .city-card .addr { color: rgba(255,255,255,.6); font-size: 13px; line-height: 1.7; margin-top: 5px; }
+    .city-card .hrs  { color: #93C5FD; font-size: 13px; font-weight: 600; margin-top: 9px; }
+    .city-card .main { margin-top: 13px; padding-top: 13px; border-top: 1px solid rgba(255,255,255,.15); }
+    .city-card .main a { color: #fff; text-decoration: none; font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; }
+    .city-card .main a svg { width: 15px; height: 15px; stroke: #93C5FD; stroke-width: 2.5; fill: none; }
+    .ccard { background: var(--card); border-radius: 18px; padding: 16px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(59,130,246,.07), 0 4px 16px rgba(59,130,246,.05); }
+    .ccard-dept  { font-size: 10px; font-weight: 800; color: var(--blue); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 6px; }
+    .ccard-name  { font-size: 17px; font-weight: 800; letter-spacing: -.3px; }
+    .ccard-title { font-size: 12px; color: var(--muted); margin-top: 2px; margin-bottom: 14px; }
+    .ccard-btns  { display: flex; gap: 9px; }
+    .cbtn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; border-radius: 11px; text-decoration: none; font-size: 12px; font-weight: 700; border: none; cursor: pointer; transition: opacity .15s; }
+    .cbtn:active { opacity: .75; }
+    .cbtn svg    { width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.5; fill: none; flex-shrink: 0; }
+    .cbtn.ph     { background: var(--blue-tint); color: var(--blue); }
+    .cbtn.em     { background: rgba(245,158,11,.1); color: #B45309; }
+    .cbtn.em.tbd { opacity: .45; cursor: default; }
+
+    /* ── FILES TAB ── */
+    .fcard { background: var(--card); border-radius: 20px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(59,130,246,.07), 0 4px 16px rgba(59,130,246,.05); overflow: hidden; }
+    .fcard-head { padding: 12px 14px 10px; border-bottom: 1px solid var(--soft); display: flex; align-items: center; justify-content: space-between; }
+    .fcard-left { display: flex; align-items: center; gap: 8px; }
+    .fcard-name { font-size: 14px; font-weight: 700; }
+    .fcard-ct   { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 100px; background: var(--blue-tint); color: var(--blue); }
+    .frow { display: flex; align-items: center; gap: 11px; padding: 10px 14px; border-bottom: 1px solid var(--soft); text-decoration: none; color: inherit; }
+    .frow:last-child { border-bottom: none; }
+    .frow:active { background: var(--soft); }
+    .fthumb { width: 38px; height: 38px; border-radius: 9px; background: var(--blue-tint2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; overflow: hidden; }
+    .fthumb img { width: 100%; height: 100%; object-fit: cover; }
+    .finfo  { flex: 1; min-width: 0; }
+    .fname  { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fdate  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .fdel   { background: none; border: none; color: var(--muted); font-size: 14px; cursor: pointer; padding: 6px 8px; border-radius: 8px; transition: color .15s, background .15s; }
+    .fdel:active { color: var(--red); background: rgba(239,68,68,.08); }
+    .fempty { padding: 14px; color: var(--muted); font-size: 12px; font-style: italic; }
+
+    /* ── BOTTOM NAV ── */
+    .bot-nav { background: var(--card); border-top: 1px solid var(--border); display: flex; flex-shrink: 0; padding-bottom: var(--safe-bottom); }
+    .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 10px 0; border: none; background: none; color: var(--muted); font-size: 10px; font-weight: 600; cursor: pointer; letter-spacing: .2px; -webkit-user-select: none; user-select: none; transition: color .15s; }
+    .nav-btn svg { width: 22px; height: 22px; stroke: currentColor; stroke-width: 1.8; fill: none; transition: stroke-width .15s; }
+    .nav-btn.active { color: var(--blue); }
+    .nav-btn.active svg { stroke-width: 2.4; }
+
+    /* ── TOAST ── */
+    .toast { position: fixed; bottom: calc(74px + var(--safe-bottom)); left: 50%; transform: translateX(-50%) translateY(12px); background: rgba(15,23,42,.9); backdrop-filter: blur(12px); color: #fff; padding: 9px 20px; border-radius: 100px; font-size: 13px; font-weight: 600; opacity: 0; transition: all .22s cubic-bezier(.4,0,.2,1); pointer-events: none; z-index: 500; white-space: nowrap; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── UPLOAD OVERLAY ── */
+    .uov { position: fixed; inset: 0; z-index: 800; background: rgba(15,23,42,.4); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; }
+    .ucard { background: var(--card); border-radius: 22px; padding: 32px 44px; text-align: center; box-shadow: 0 20px 60px rgba(15,23,42,.18); }
+    .uspinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--blue); animation: spin .7s linear infinite; margin: 0 auto 12px; }
+    .ucard p { font-size: 14px; font-weight: 700; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<div id="pin-screen">
+  <div class="pin-icon">🏗️</div>
+  <div class="pin-title">Atlantis Progress</div>
+  <div class="pin-sub">Storage Facility Development</div>
+  <div class="pin-dots">
+    <div class="pin-dot" id="d0"></div><div class="pin-dot" id="d1"></div>
+    <div class="pin-dot" id="d2"></div><div class="pin-dot" id="d3"></div>
+  </div>
+  <div class="pin-keypad" id="keypad">
+    <button class="pin-key" data-k="1">1</button><button class="pin-key" data-k="2">2</button><button class="pin-key" data-k="3">3</button>
+    <button class="pin-key" data-k="4">4</button><button class="pin-key" data-k="5">5</button><button class="pin-key" data-k="6">6</button>
+    <button class="pin-key" data-k="7">7</button><button class="pin-key" data-k="8">8</button><button class="pin-key" data-k="9">9</button>
+    <button class="pin-key blank"></button><button class="pin-key" data-k="0">0</button><button class="pin-key del" data-k="⌫">⌫</button>
+  </div>
+  <div class="pin-error" id="pin-err"></div>
+</div>
+
+<div id="app" class="hidden">
+  <div class="app-header">
+    <div class="header-row">
+      <div>
+        <div class="header-title">Atlantis Progress</div>
+        <div class="header-sub">Storage Facility Development</div>
+      </div>
+      <div class="pct-badge" id="pct-badge">0%</div>
+    </div>
+  </div>
+  <div class="bar-wrap">
+    <div class="bar-track"><div class="bar-fill" id="bar" style="width:0%"></div></div>
+    <div class="bar-label" id="bar-label">0 of 0 steps complete</div>
+  </div>
+
+  <div class="scroll-area">
+    <div class="tab-pane" id="tab-progress"></div>
+    <div class="tab-pane hidden" id="tab-info"></div>
+    <div class="tab-pane hidden" id="tab-files"></div>
+  </div>
+
+  <nav class="bot-nav">
+    <button class="nav-btn active" data-tab="progress">
+      <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      Progress
+    </button>
+    <button class="nav-btn" data-tab="info">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Info
+    </button>
+    <button class="nav-btn" data-tab="files">
+      <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+      Files
+    </button>
+  </nav>
+</div>
+
+<div class="toast" id="toast"></div>
+<input type="file" id="file-input" style="display:none" multiple accept="image/*,application/pdf,.doc,.docx,.xlsx,.xls">
+
+<div class="modal-overlay hidden" id="del-modal">
+  <div class="modal-card">
+    <div class="modal-title">Delete item?</div>
+    <div class="modal-sub" id="del-name"></div>
+    <div class="modal-btns">
+      <button class="modal-btn cancel" id="del-cancel">Cancel</button>
+      <button class="modal-btn del"    id="del-confirm">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="add-modal">
+  <div class="modal-card">
+    <!-- Page 1: Name -->
+    <div class="modal-page" id="modal-p1">
+      <div class="modal-title" id="modal-title">Add Item</div>
+      <div class="modal-sub">What do you want to track?</div>
+      <input class="modal-input" id="modal-input" type="text" placeholder="e.g. Retaining Wall…" maxlength="60">
+      <div class="modal-btns">
+        <button class="modal-btn cancel" id="modal-cancel">Cancel</button>
+        <button class="modal-btn save" id="modal-next">Next →</button>
+      </div>
+    </div>
+    <!-- Page 2: Step picker -->
+    <div class="modal-page hidden" id="modal-p2">
+      <div class="modal-title">Choose Steps</div>
+      <div class="modal-sub">Tap in the order you want them to appear</div>
+      <div class="chip-pool" id="chip-pool"></div>
+      <div class="modal-btns">
+        <button class="modal-btn cancel" id="modal-back">← Back</button>
+        <button class="modal-btn save" id="modal-save">Add Item</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+
+// ── CONFIG ──────────────────────────────────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey:            "REPLACE_WITH_YOUR_API_KEY",
+  authDomain:        "REPLACE_WITH_YOUR_AUTH_DOMAIN",
+  projectId:         "REPLACE_WITH_YOUR_PROJECT_ID",
+  storageBucket:     "REPLACE_WITH_YOUR_STORAGE_BUCKET",
+  messagingSenderId: "REPLACE_WITH_YOUR_MESSAGING_SENDER_ID",
+  appId:             "REPLACE_WITH_YOUR_APP_ID"
+};
+const PIN = '1234';
+
+// ── DATA ─────────────────────────────────────────────────────────
+const d = s => [...s, 'Job Done'];
+const STD  = d(['Plan Made','Plan Submitted','Plan Approved','Work Started','Work Completed']);
+const DIGI = d(['Setup Started','Created','Live / Active']);
+const CONT = d(['Drafted','Signed']);
+const SIMP = d(['Started','Completed']);
+
+const SECTIONS = [
+  { id:'contracts',      name:'Contracts',          icon:'📋' },
+  { id:'siteplan',       name:'Site Plan',           icon:'📐' },
+  { id:'electrical',     name:'Electrical',          icon:'⚡' },
+  { id:'plumbing',       name:'Plumbing',            icon:'🔧' },
+  { id:'landscaping',    name:'Landscaping',         icon:'🌿' },
+  { id:'infrastructure', name:'Infrastructure',      icon:'🏗️' },
+  { id:'security',       name:'Security & Tech',     icon:'🔒' },
+  { id:'signage',        name:'Signage',             icon:'🪧' },
+  { id:'digital',        name:'Digital & Marketing', icon:'💻' },
+];
+
+const ITEMS = [
+  // Contracts
+  { id:'con1', section:'contracts',      name:'Main Contract',             steps:CONT },
+  { id:'con2', section:'contracts',      name:'Consulting Agreement',      steps:CONT },
+  // Site Plan
+  { id:'sp1',  section:'siteplan',       name:'Site Plan',                 steps:d(['Plan Made','Plan Submitted','Plan Approved']) },
+  // Electrical
+  { id:'el1',  section:'electrical',     name:'Underground Conduit',       steps:STD },
+  { id:'el2',  section:'electrical',     name:'Electrical Poles',          steps:STD },
+  // Plumbing
+  { id:'pl1',  section:'plumbing',       name:'Wash Station Plumbing',     steps:STD },
+  // Landscaping (includes permits)
+  { id:'ls1',  section:'landscaping',    name:'Fencing',                   steps:STD },
+  { id:'ls2',  section:'landscaping',    name:'Hedges',                    steps:STD },
+  { id:'pe1',  section:'landscaping',    name:'Landscaping Permit',        steps:STD },
+  { id:'pe2',  section:'landscaping',    name:'Gravel Permit',             steps:STD },
+  { id:'pe3',  section:'landscaping',    name:'57 Rock Permit',            steps:STD },
+  { id:'pe4',  section:'landscaping',    name:'Road Paving Permit',        steps:STD },
+  // Infrastructure
+  { id:'in1',  section:'infrastructure', name:'Move RV',                   steps:SIMP },
+  { id:'in2',  section:'infrastructure', name:'Space Lining & Numbering',  steps:STD },
+  // Security & Tech
+  { id:'se1',  section:'security',       name:'Security System',           steps:STD },
+  { id:'se2',  section:'security',       name:'Security Cameras',          steps:STD },
+  { id:'se3',  section:'security',       name:'Starlink',                  steps:SIMP },
+  // Signage
+  { id:'si1',  section:'signage',        name:'Exterior Signage & Permit', steps:STD },
+  { id:'si2',  section:'signage',        name:'Interior Signage',          steps:STD },
+  // Digital & Marketing
+  { id:'dm1',  section:'digital',        name:'Website',                   steps:DIGI },
+  { id:'dm2',  section:'digital',        name:'Sitelink',                  steps:DIGI },
+  { id:'dm3',  section:'digital',        name:'Google Business Page',      steps:DIGI },
+  { id:'dm4',  section:'digital',        name:'Email',                     steps:DIGI },
+  { id:'dm5',  section:'digital',        name:'Social Media',              steps:DIGI },
+];
+
+const CONTACTS = [
+  { name:'Michael Crisafulle', title:'Building Official',         dept:'Building Department', phone:'5619651744', phoneTxt:'(561) 965-1744 ext. 112', email:'' },
+  { name:'Lynne Carranza',     title:'Building Department Clerk', dept:'Building Department', phone:'5619651744', phoneTxt:'(561) 965-1744 ext. 112', email:'' },
+  { name:'Brian Moree',        title:'City Manager',              dept:'City Administration', phone:'5619651744', phoneTxt:'(561) 965-1744',           email:'' },
+];
+
+// ── FIREBASE ─────────────────────────────────────────────────────
+import { initializeApp }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection, serverTimestamp }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
+
+let db, storage;
+try {
+  const app = initializeApp(FIREBASE_CONFIG);
+  db      = getFirestore(app);
+  storage = getStorage(app);
+} catch(e) { console.error('Firebase init:', e); }
+
+// ── STATE ─────────────────────────────────────────────────────────
+let stepStates    = {};
+let attachments   = [];
+let activeTab     = 'progress';
+let uploadSection = null;
+let customItems   = JSON.parse(localStorage.getItem('ap_custom') || '[]');
+const allItems    = () => [...ITEMS, ...customItems];
+let addModalSection = null;
+
+// ── PIN ───────────────────────────────────────────────────────────
+let pinEntry = '';
+document.querySelectorAll('.pin-key').forEach(k => k.addEventListener('click', () => onKey(k.dataset.k)));
+
+function onKey(k) {
+  if (!k) return;
+  if (k === '⌫') pinEntry = pinEntry.slice(0,-1);
+  else if (pinEntry.length < 4) pinEntry += k;
+  syncDots();
+  if (pinEntry.length === 4) setTimeout(checkPin, 130);
+}
+function syncDots(err=false) {
+  for (let i=0;i<4;i++) {
+    const d = document.getElementById(`d${i}`);
+    d.classList.toggle('filled', !err && i<pinEntry.length);
+    d.classList.toggle('error',  err);
+  }
+}
+function checkPin() {
+  if (pinEntry === PIN) { localStorage.setItem('ap_auth', Date.now()); openApp(); }
+  else {
+    syncDots(true);
+    document.getElementById('pin-err').textContent = 'Incorrect PIN';
+    document.getElementById('keypad').classList.add('shake');
+    setTimeout(() => {
+      document.getElementById('keypad').classList.remove('shake');
+      document.getElementById('pin-err').textContent = '';
+      pinEntry = ''; syncDots();
+    }, 1000);
+  }
+}
+function openApp() {
+  document.getElementById('pin-screen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+}
+if (localStorage.getItem('ap_auth') && Date.now() - +localStorage.getItem('ap_auth') < 86400000) openApp();
+
+// ── FIREBASE LISTENERS ────────────────────────────────────────────
+if (db) {
+  onSnapshot(collection(db,'steps'), snap => {
+    stepStates = {};
+    snap.forEach(d => { stepStates[d.id] = d.data(); });
+    renderProgress();
+  });
+  onSnapshot(collection(db,'attachments'), snap => {
+    attachments = [];
+    snap.forEach(d => { attachments.push({ id:d.id, ...d.data() }); });
+    attachments.sort((a,b) => (b.uploadedAt?.seconds||0)-(a.uploadedAt?.seconds||0));
+    renderProgress(); renderFiles();
+  });
+} else {
+  showToast('⚠️ Check Firebase config');
+}
+
+// ── TABS ──────────────────────────────────────────────────────────
+document.querySelectorAll('.nav-btn').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`tab-${tab}`).classList.remove('hidden');
+  document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+  document.querySelector('.bar-wrap').style.display = tab === 'progress' ? '' : 'none';
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────
+const skey = (itemId, si) => `${itemId}_${si}`;
+// Job Done is the last step — auto-derived, never stored in Firebase
+const realStepCount = item => item.steps.length - 1;
+const totalSteps = () => allItems().reduce((s,i) => s + realStepCount(i), 0);
+const doneSteps  = () => allItems().reduce((s,item) =>
+  s + item.steps.slice(0,-1).filter((_,si) => stepStates[skey(item.id,si)]?.completed).length, 0);
+const itemDone = item => item.steps.slice(0,-1).every((_,si) => stepStates[skey(item.id,si)]?.completed);
+
+// ── RENDER: PROGRESS ─────────────────────────────────────────────
+function renderProgress() {
+  const done  = doneSteps();
+  const total = totalSteps();
+  const pct   = total ? Math.round(done/total*100) : 0;
+  document.getElementById('bar').style.width  = pct + '%';
+  document.getElementById('bar-label').textContent  = `${done} of ${total} steps complete`;
+  document.getElementById('pct-badge').textContent  = pct + '%';
+
+  const el = document.getElementById('tab-progress');
+  el.innerHTML = SECTIONS.map(sec => {
+    const items    = allItems().filter(i => i.section === sec.id);
+    const secTotal = items.reduce((s,i) => s + realStepCount(i), 0);
+    const secDone  = items.reduce((s,item) =>
+      s + item.steps.slice(0,-1).filter((_,si) => stepStates[skey(item.id,si)]?.completed).length, 0);
+    const full     = secDone === secTotal;
+    const atts     = attachments.filter(a => a.section === sec.id).length;
+
+    return `
+      <div class="section-card">
+        <div class="section-head">
+          <div class="sec-icon">${sec.icon}</div>
+          <div class="sec-text">
+            <div class="sec-title">${sec.name}</div>
+            <div class="sec-prog">${secDone} of ${secTotal} steps</div>
+          </div>
+          <div class="sec-right">
+            <button class="plus-btn" data-add-sec="${sec.id}" title="Add item">+</button>
+            <button class="clip-btn ${atts>0?'lit':''}" data-sec="${sec.id}">
+              <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+              ${atts>0?`<span class="clip-badge">${atts}</span>`:''}
+            </button>
+            <span class="sec-badge ${full?'done':''}">${secDone}/${secTotal}</span>
+          </div>
+        </div>
+        <div class="items-wrap">${items.map(item => renderItem(item)).join('')}</div>
+      </div>`;
+  }).join('');
+
+  el.querySelectorAll('.plus-btn').forEach(btn =>
+    btn.addEventListener('click', () => openAddModal(btn.dataset.addSec))
+  );
+  el.querySelectorAll('.clip-btn').forEach(btn =>
+    btn.addEventListener('click', () => { uploadSection = btn.dataset.sec; document.getElementById('file-input').click(); })
+  );
+  el.querySelectorAll('.hstep-node[data-item]').forEach(node =>
+    node.addEventListener('click', () => {
+      const { item, step, state } = node.dataset;
+      if (state === 'active') toggleStep(item, +step, true);
+      if (state === 'done') {
+        const itm = allItems().find(i => i.id === item);
+        const laterDone = itm.steps.slice(0,-1).some((_,si) => si > +step && stepStates[skey(item,si)]?.completed);
+        if (laterDone) { showToast('Uncheck later steps first'); return; }
+        toggleStep(item, +step, false);
+      }
+    })
+  );
+  el.querySelectorAll('.item-del').forEach(btn =>
+    btn.addEventListener('click', () => deleteCustomItem(btn.dataset.id))
+  );
+}
+
+function renderItem(item) {
+  const complete = itemDone(item);
+  const lastIdx  = item.steps.length - 1;
+
+  const nodesHTML = item.steps.map((label, si) => {
+    const isJobDone = si === lastIdx;
+    const conn = si > 0 ? `<div class="hstep-conn ${!!stepStates[skey(item.id,si-1)]?.completed?'done':''}"></div>` : '';
+
+    if (isJobDone) {
+      const priorDone = !!stepStates[skey(item.id, lastIdx-1)]?.completed;
+      const cls  = complete ? 'done' : 'locked';
+      const icon = `<svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg>`;
+      return `${mkBridge(priorDone)}<div class="hstep-col">
+        <div class="hstep-node ${cls}">${complete ? icon : '✓'}</div>
+        <div class="hstep-lbl">${label}</div>
+      </div>`;
+    }
+
+    const done    = !!stepStates[skey(item.id, si)]?.completed;
+    const prev    = si === 0 || !!stepStates[skey(item.id, si-1)]?.completed;
+    const active  = !done && prev;
+    const cls     = done ? 'done' : active ? 'active' : 'locked';
+    const content = done ? `<svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg>` : si + 1;
+
+    return `${conn}<div class="hstep-col">
+      <div class="hstep-node ${cls}" data-item="${item.id}" data-step="${si}" data-state="${cls}">${content}</div>
+      <div class="hstep-lbl">${label}</div>
+    </div>`;
+  }).join('');
+
+  const delBtn = item.custom ? `<button class="item-del" data-id="${item.id}">✕</button>` : '';
+  return `
+    <div class="item-row${complete?' complete':''}">
+      <div class="item-name ${complete?'done':''}">
+        ${complete ? '<span class="item-check">✓</span>' : ''}${item.name}${delBtn}
+      </div>
+      <div class="hstep">${nodesHTML}</div>
+    </div>`;
+}
+
+// ── TOGGLE STEP ───────────────────────────────────────────────────
+async function toggleStep(itemId, si, completed) {
+  if (!db) { showToast('No database'); return; }
+  try {
+    await setDoc(doc(db,'steps', skey(itemId,si)), { completed, completedAt: completed ? serverTimestamp() : null });
+    showToast(completed ? '✓ Step complete' : 'Step unchecked');
+  } catch(e) { console.error(e); showToast('Error — try again'); }
+}
+
+// ── FILE UPLOAD ───────────────────────────────────────────────────
+document.getElementById('file-input').addEventListener('change', async e => {
+  const files = Array.from(e.target.files);
+  if (!files.length || !uploadSection) return;
+  const ov = Object.assign(document.createElement('div'), { className:'uov' });
+  ov.innerHTML = `<div class="ucard"><div class="uspinner"></div><p>Uploading…</p></div>`;
+  document.body.appendChild(ov);
+  for (const f of files) await uploadFile(f, uploadSection);
+  ov.remove(); e.target.value = '';
+});
+
+async function uploadFile(file, secId) {
+  if (!db || !storage) { showToast('No database'); return; }
+  try {
+    const ts   = Date.now();
+    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    const sRef = ref(storage, `attachments/${secId}/${ts}_${safe}`);
+    const snap = await uploadBytes(sRef, file);
+    const url  = await getDownloadURL(snap.ref);
+    await setDoc(doc(db,'attachments',`${secId}_${ts}`), {
+      section:secId, fileName:file.name, fileUrl:url, fileType:file.type,
+      storagePath:snap.ref.fullPath, uploadedAt:serverTimestamp(), size:file.size,
+    });
+    showToast('✓ File attached');
+  } catch(e) { console.error(e); showToast('Upload failed'); }
+}
+
+// ── RENDER: INFO ──────────────────────────────────────────────────
+(function renderInfo() {
+  const phoneIcon = `<svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 11a19.79 19.79 0 01-3.07-8.67A2 2 0 012 .84h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>`;
+  const emailIcon = `<svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`;
+  document.getElementById('tab-info').innerHTML = `
+    <div class="city-card">
+      <h2>City of Atlantis</h2>
+      <div class="addr">260 Orange Tree Drive<br>Atlantis, FL 33462</div>
+      <div class="hrs">Mon – Fri &nbsp; 8:30 am – 4:30 pm</div>
+      <div class="main">
+        <a href="tel:+15619651744">${phoneIcon} Main Line: (561) 965-1744</a>
+      </div>
+    </div>
+    ${CONTACTS.map(c => `
+      <div class="ccard">
+        <div class="ccard-dept">${c.dept}</div>
+        <div class="ccard-name">${c.name}</div>
+        <div class="ccard-title">${c.title}</div>
+        <div class="ccard-btns">
+          <a href="tel:+1${c.phone}" class="cbtn ph">${phoneIcon}${c.phoneTxt}</a>
+          ${c.email
+            ? `<a href="mailto:${c.email}" class="cbtn em">${emailIcon}Email</a>`
+            : `<span class="cbtn em tbd">${emailIcon}Email TBD</span>`}
+        </div>
+      </div>`).join('')}`;
+})();
+
+// ── RENDER: FILES ─────────────────────────────────────────────────
+function renderFiles() {
+  document.getElementById('tab-files').innerHTML = SECTIONS.map(sec => {
+    const secFiles = attachments.filter(a => a.section === sec.id);
+    return `
+      <div class="fcard">
+        <div class="fcard-head">
+          <div class="fcard-left">
+            <span>${sec.icon}</span>
+            <span class="fcard-name">${sec.name}</span>
+          </div>
+          ${secFiles.length ? `<span class="fcard-ct">${secFiles.length} file${secFiles.length>1?'s':''}</span>` : ''}
+        </div>
+        ${secFiles.length
+          ? secFiles.map(f => fileRow(f)).join('')
+          : `<div class="fempty">No files attached yet</div>`}
+      </div>`;
+  }).join('');
+
+  document.querySelectorAll('.fdel').forEach(btn =>
+    btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); deleteFile(btn.dataset.id, btn.dataset.path); })
+  );
+}
+
+function fileRow(att) {
+  const thumb = att.fileType?.startsWith('image/')    ? `<img src="${att.fileUrl}" loading="lazy" alt="">`
+    : att.fileType === 'application/pdf'               ? '📄'
+    : att.fileType?.includes('word')                   ? '📝'
+    : att.fileType?.includes('sheet')                  ? '📊' : '📎';
+  const date = att.uploadedAt
+    ? new Date(att.uploadedAt.seconds*1000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})
+    : '';
+  return `
+    <a class="frow" href="${att.fileUrl}" target="_blank" rel="noopener noreferrer">
+      <div class="fthumb">${thumb}</div>
+      <div class="finfo">
+        <div class="fname">${att.fileName}</div>
+        ${date?`<div class="fdate">${date}</div>`:''}
+      </div>
+      <button class="fdel" data-id="${att.id}" data-path="${att.storagePath||''}">✕</button>
+    </a>`;
+}
+
+async function deleteFile(id, path) {
+  if (!confirm('Delete this file?')) return;
+  try {
+    await deleteDoc(doc(db,'attachments',id));
+    if (path) await deleteObject(ref(storage,path)).catch(()=>{});
+    showToast('File deleted');
+  } catch(e) { console.error(e); showToast('Delete failed'); }
+}
+
+// ── BRIDGE SVG ────────────────────────────────────────────────────
+function mkBridge(fixed) {
+  const ve = 'vector-effect="non-scaling-stroke"';
+  // 12 evenly-spaced slat x-positions in a 200-unit viewBox
+  const allX = [10,26,42,58,74,90,110,126,142,158,174,190];
+  // gap: 83–117 → remove x=90 and x=110
+  const sideX = allX.filter(x => x < 83 || x > 117);
+
+  const mkSlats = xs => xs.map(x =>
+    `<line x1="${x}" y1="7" x2="${x}" y2="19" ${ve}/>`).join('');
+
+  return `<div class="bridge-wrap">
+    <svg class="bridge-svg ${fixed?'fixed':'broken'}" viewBox="0 0 200 24" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <g class="g-fixed">
+        <line x1="0"   y1="7"  x2="200" y2="7"  ${ve}/>
+        <line x1="0"   y1="19" x2="200" y2="19" ${ve}/>
+        ${mkSlats(allX)}
+      </g>
+      <g class="g-broken">
+        <line x1="0"   y1="7"  x2="83"  y2="7"  ${ve}/>
+        <line x1="0"   y1="19" x2="83"  y2="19" ${ve}/>
+        <line x1="83"  y1="7"  x2="87"  y2="19" ${ve}/>
+        <line x1="117" y1="7"  x2="200" y2="7"  ${ve}/>
+        <line x1="117" y1="19" x2="200" y2="19" ${ve}/>
+        <line x1="117" y1="7"  x2="113" y2="19" ${ve}/>
+        ${mkSlats(sideX)}
+      </g>
+    </svg>
+  </div>`;
+}
+
+// ── ADD ITEM MODAL ────────────────────────────────────────────────
+const STEP_POOL = [
+  'Plan Made','Plan Submitted','Plan Approved',
+  'Work Started','Work Completed',
+  'Drafted','Signed',
+  'Applied','Approved',
+  'Permit Applied','Permit Approved',
+  'Setup Started','Created','Live / Active',
+  'Started','Completed',
+  'Inspection Scheduled','Inspection Passed',
+  'Quote Received','Vendor Selected',
+  'Materials Ordered','Materials Delivered',
+];
+
+let selectedSteps = [];
+
+function openAddModal(secId) {
+  addModalSection = secId;
+  const sec = SECTIONS.find(s => s.id === secId);
+  document.getElementById('modal-title').textContent = `Add to ${sec.name}`;
+  document.getElementById('modal-input').value = '';
+  selectedSteps = [];
+  showModalPage(1);
+  document.getElementById('add-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('modal-input').focus(), 50);
+}
+function closeAddModal() {
+  document.getElementById('add-modal').classList.add('hidden');
+  addModalSection = null;
+  selectedSteps = [];
+}
+function showModalPage(n) {
+  document.getElementById('modal-p1').classList.toggle('hidden', n !== 1);
+  document.getElementById('modal-p2').classList.toggle('hidden', n !== 2);
+  if (n === 2) renderChipPool();
+}
+function renderChipPool() {
+  const pool = document.getElementById('chip-pool');
+  pool.innerHTML = STEP_POOL.map(step => {
+    const idx = selectedSteps.indexOf(step);
+    const sel = idx !== -1;
+    return `<div class="step-chip ${sel?'sel':''}" data-step="${step}">
+      ${step}${sel ? `<span class="chip-num">${idx+1}</span>` : ''}
+    </div>`;
+  }).join('');
+  pool.querySelectorAll('.step-chip').forEach(chip =>
+    chip.addEventListener('click', () => {
+      const s = chip.dataset.step;
+      const idx = selectedSteps.indexOf(s);
+      if (idx !== -1) selectedSteps.splice(idx, 1);
+      else selectedSteps.push(s);
+      renderChipPool();
+    })
+  );
+}
+function saveNewItem() {
+  if (!selectedSteps.length) { showToast('Pick at least one step'); return; }
+  const name = document.getElementById('modal-input').value.trim();
+  const id   = 'custom_' + Date.now();
+  const steps = d(selectedSteps);
+  customItems.push({ id, section: addModalSection, name, steps, custom: true });
+  localStorage.setItem('ap_custom', JSON.stringify(customItems));
+  closeAddModal();
+  renderProgress(); renderFiles();
+}
+let pendingDelId = null;
+function deleteCustomItem(id) {
+  const item = customItems.find(i => i.id === id);
+  if (!item) return;
+  pendingDelId = id;
+  document.getElementById('del-name').textContent = `"${item.name}" will be permanently removed.`;
+  document.getElementById('del-modal').classList.remove('hidden');
+}
+function confirmDelete() {
+  if (!pendingDelId) return;
+  customItems = customItems.filter(i => i.id !== pendingDelId);
+  localStorage.setItem('ap_custom', JSON.stringify(customItems));
+  pendingDelId = null;
+  document.getElementById('del-modal').classList.add('hidden');
+  renderProgress(); renderFiles();
+}
+document.getElementById('del-confirm').addEventListener('click', confirmDelete);
+document.getElementById('del-cancel').addEventListener('click', () => {
+  pendingDelId = null;
+  document.getElementById('del-modal').classList.add('hidden');
+});
+document.getElementById('del-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) { pendingDelId = null; document.getElementById('del-modal').classList.add('hidden'); }
+});
+
+document.getElementById('modal-cancel').addEventListener('click', closeAddModal);
+document.getElementById('modal-next').addEventListener('click', () => {
+  if (!document.getElementById('modal-input').value.trim()) { showToast('Enter a name first'); return; }
+  showModalPage(2);
+});
+document.getElementById('modal-back').addEventListener('click', () => showModalPage(1));
+document.getElementById('modal-save').addEventListener('click', saveNewItem);
+document.getElementById('modal-input').addEventListener('keydown', e => { if (e.key === 'Enter') { if (!document.getElementById('modal-input').value.trim()) return; showModalPage(2); } if (e.key === 'Escape') closeAddModal(); });
+document.getElementById('add-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeAddModal(); });
+
+// ── TOAST ─────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── SERVICE WORKER ────────────────────────────────────────────────
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+
+// Initial render
+renderProgress();
+renderFiles();
+
+</script>
+</body>
+</html>
 
