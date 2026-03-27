@@ -77,6 +77,9 @@
       border: 1px solid rgba(255,255,255,.2); border-radius: 100px;
       padding: 5px 12px; color: #fff; font-size: 12px; font-weight: 700;
     }
+    .logout-btn { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2); border-radius: 10px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s; flex-shrink: 0; }
+    .logout-btn:active { background: rgba(255,255,255,.28); }
+    .logout-btn svg { width: 15px; height: 15px; stroke: #fff; stroke-width: 2.2; fill: none; }
     .bar-wrap   { background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%); padding: 0 18px 14px; flex-shrink: 0; }
     .bar-track  { background: rgba(255,255,255,.2); border-radius: 100px; height: 4px; overflow: hidden; }
     .bar-fill   { background: linear-gradient(90deg, #93C5FD, #34D399); height: 100%; border-radius: 100px; transition: width .6s cubic-bezier(.4,0,.2,1); }
@@ -324,7 +327,12 @@
         <div class="header-title" id="header-title">Mizner Storall of Atlantis</div>
         <div class="header-sub">Storage Facility Development</div>
       </div>
-      <div class="pct-badge" id="pct-badge">0%</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="pct-badge" id="pct-badge">0%</div>
+        <button class="logout-btn" id="logout-btn" title="Log out">
+          <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
     </div>
   </div>
   <div class="bar-wrap">
@@ -539,6 +547,11 @@ let collapsedSections = new Set();
 // ── PIN ───────────────────────────────────────────────────────────
 let pinEntry = '';
 document.querySelectorAll('.pin-key').forEach(k => k.addEventListener('click', () => onKey(k.dataset.k)));
+document.addEventListener('keydown', e => {
+  if (document.getElementById('pin-screen').classList.contains('hidden')) return;
+  if (/^[0-9]$/.test(e.key)) onKey(e.key);
+  if (e.key === 'Backspace') onKey('⌫');
+});
 
 function onKey(k) {
   if (!k) return;
@@ -593,6 +606,13 @@ if (db) {
 // ── TABS ──────────────────────────────────────────────────────────
 document.querySelectorAll('.nav-btn').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
 document.getElementById('header-title').addEventListener('click', () => switchTab('progress'));
+document.getElementById('logout-btn').addEventListener('click', () => {
+  if (!confirm('Log out?')) return;
+  localStorage.removeItem('ap_auth');
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('pin-screen').classList.remove('hidden');
+  pinEntry = ''; syncDots();
+});
 
 function switchTab(tab) {
   activeTab = tab;
@@ -922,4 +942,303 @@ function openAddModal(secId) {
   document.getElementById('add-modal').classList.remove('hidden');
   setTimeout(() => document.getElementById('modal-input').focus(), 50);
 }
-function closeAdd
+function closeAddModal() {
+  document.getElementById('add-modal').classList.add('hidden');
+  addModalSection = null;
+  selectedSteps = [];
+}
+function showModalPage(n) {
+  document.getElementById('modal-p1').classList.toggle('hidden', n !== 1);
+  document.getElementById('modal-p2').classList.toggle('hidden', n !== 2);
+  if (n === 2) renderChipPool();
+}
+function renderChipPool() {
+  const pool = document.getElementById('chip-pool');
+  pool.innerHTML = STEP_POOL.map(step => {
+    const idx = selectedSteps.indexOf(step);
+    const sel = idx !== -1;
+    return `<div class="step-chip ${sel?'sel':''}" data-step="${step}">
+      ${step}${sel ? `<span class="chip-num">${idx+1}</span>` : ''}
+    </div>`;
+  }).join('');
+  pool.querySelectorAll('.step-chip').forEach(chip =>
+    chip.addEventListener('click', () => {
+      const s = chip.dataset.step;
+      const idx = selectedSteps.indexOf(s);
+      if (idx !== -1) selectedSteps.splice(idx, 1);
+      else selectedSteps.push(s);
+      renderChipPool();
+    })
+  );
+}
+function saveNewItem() {
+  if (!selectedSteps.length) { showToast('Pick at least one step'); return; }
+  const name = document.getElementById('modal-input').value.trim();
+  const id   = 'custom_' + Date.now();
+  activeItems.push({ id, section: addModalSection, name, steps: d(selectedSteps), custom: true });
+  persistState();
+  closeAddModal();
+  renderProgress(); renderFiles();
+}
+let pendingDelId = null;
+function deleteCustomItem(id) {
+  const item = activeItems.find(i => i.id === id);
+  if (!item) return;
+  pendingDelId = id;
+  document.getElementById('del-name').textContent = `"${item.name}" will be permanently removed.`;
+  document.getElementById('del-modal').classList.remove('hidden');
+}
+function confirmDelete() {
+  if (!pendingDelId) return;
+  if (typeof pendingDelId === 'string' && pendingDelId.startsWith('sec:')) {
+    const secId = pendingDelId.slice(4);
+    activeSections = activeSections.filter(s => s.id !== secId);
+    activeItems    = activeItems.filter(i => i.section !== secId);
+  } else {
+    activeItems = activeItems.filter(i => i.id !== pendingDelId);
+  }
+  persistState();
+  pendingDelId = null;
+  document.getElementById('del-modal').classList.add('hidden');
+  renderProgress(); renderFiles();
+}
+document.getElementById('del-confirm').addEventListener('click', confirmDelete);
+document.getElementById('del-cancel').addEventListener('click', () => {
+  pendingDelId = null;
+  document.getElementById('del-modal').classList.add('hidden');
+});
+document.getElementById('del-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) { pendingDelId = null; document.getElementById('del-modal').classList.add('hidden'); }
+});
+
+document.getElementById('modal-cancel').addEventListener('click', closeAddModal);
+document.getElementById('modal-next').addEventListener('click', () => {
+  if (!document.getElementById('modal-input').value.trim()) { showToast('Enter a name first'); return; }
+  showModalPage(2);
+});
+document.getElementById('modal-back').addEventListener('click', () => showModalPage(1));
+document.getElementById('modal-save').addEventListener('click', saveNewItem);
+document.getElementById('modal-input').addEventListener('keydown', e => { if (e.key === 'Enter') { if (!document.getElementById('modal-input').value.trim()) return; showModalPage(2); } if (e.key === 'Escape') closeAddModal(); });
+document.getElementById('add-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeAddModal(); });
+
+// ── GEAR MODAL ───────────────────────────────────────────────────
+let gearItemId    = null;
+let gearItemSteps = [];
+
+function openGearModal(itemId) {
+  gearItemId = itemId;
+  const item = activeItems.find(i => i.id === itemId);
+  if (!item) return;
+  document.getElementById('gear-name-input').value = item.name;
+  gearItemSteps = item.steps.slice(0, -1); // strip Job Done
+  renderGearChips();
+  document.getElementById('gear-modal').classList.remove('hidden');
+}
+function closeGearModal() {
+  document.getElementById('gear-modal').classList.add('hidden');
+  gearItemId = null;
+}
+function renderGearChips() {
+  const pool = document.getElementById('gear-chip-pool');
+  pool.innerHTML = STEP_POOL.map(step => {
+    const idx = gearItemSteps.indexOf(step);
+    const sel = idx !== -1;
+    return `<div class="step-chip ${sel?'sel':''}" data-gstep="${step}">
+      ${step}${sel?`<span class="chip-num">${idx+1}</span>`:''}
+    </div>`;
+  }).join('');
+  pool.querySelectorAll('.step-chip[data-gstep]').forEach(chip =>
+    chip.addEventListener('click', () => {
+      const s = chip.dataset.gstep;
+      const idx = gearItemSteps.indexOf(s);
+      if (idx !== -1) gearItemSteps.splice(idx, 1); else gearItemSteps.push(s);
+      renderGearChips();
+    })
+  );
+}
+function saveGearEdit() {
+  const item = activeItems.find(i => i.id === gearItemId);
+  if (!item) { closeGearModal(); return; }
+  const newName = document.getElementById('gear-name-input').value.trim();
+  if (newName) item.name = newName;
+  if (gearItemSteps.length) item.steps = d(gearItemSteps);
+  persistState();
+  closeGearModal();
+  renderProgress(); renderFiles();
+}
+
+document.getElementById('gear-cancel').addEventListener('click', closeGearModal);
+document.getElementById('gear-save').addEventListener('click', saveGearEdit);
+document.getElementById('gear-del-item').addEventListener('click', () => {
+  const item = activeItems.find(i => i.id === gearItemId);
+  if (!item) return;
+  pendingDelId = gearItemId;
+  document.getElementById('del-name').textContent = `"${item.name}" will be permanently removed.`;
+  closeGearModal();
+  document.getElementById('del-modal').classList.remove('hidden');
+});
+document.getElementById('gear-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeGearModal();
+});
+
+// ── NOTES ─────────────────────────────────────────────────────────
+let notes = JSON.parse(localStorage.getItem('ap_notes') || '[]');
+function persistNotes() { localStorage.setItem('ap_notes', JSON.stringify(notes)); }
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderNotes() {
+  const el = document.getElementById('tab-notes');
+  const header = `<div class="notes-header">
+    <div class="notes-title">Notes</div>
+    <button class="notes-add-btn" id="notes-add-btn-inner">+ Add Note</button>
+  </div>`;
+
+  if (!notes.length) {
+    el.innerHTML = header + `<div class="notes-empty"><div>📝</div>No notes yet.<br>Tap "+ Add Note" to get started.</div>`;
+    document.getElementById('notes-add-btn-inner').addEventListener('click', openNoteModal);
+    return;
+  }
+
+  const today     = new Date(); today.setHours(0,0,0,0);
+  const yesterday = new Date(today); yesterday.setDate(today.getDate()-1);
+  const groups = {};
+  [...notes].sort((a,b) => b.createdAt - a.createdAt).forEach(n => {
+    const nd = new Date(n.createdAt); nd.setHours(0,0,0,0);
+    let label;
+    if (+nd === +today)          label = 'Today';
+    else if (+nd === +yesterday) label = 'Yesterday';
+    else label = new Date(n.createdAt).toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+    if (!groups[label]) groups[label] = [];
+    groups[label].push(n);
+  });
+
+  const replySVG = `<svg viewBox="0 0 24 24" width="12" height="12" style="stroke:currentColor;stroke-width:2.2;fill:none;flex-shrink:0"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 00-4-4H4"/></svg>`;
+
+  el.innerHTML = header + Object.entries(groups).map(([label, nts]) => `
+    <div class="note-date-grp">
+      <div class="note-date-lbl">${label}</div>
+      ${nts.map(n => {
+        const replies = (n.replies || []).sort((a,b) => a.createdAt - b.createdAt);
+        const repliesHtml = replies.length ? `<div class="note-replies">${replies.map(r => `
+          <div class="reply-card">
+            <div class="reply-time">${new Date(r.createdAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</div>
+            <div class="reply-text">${escHtml(r.text)}</div>
+            <button class="reply-del" data-note-id="${n.id}" data-reply-id="${r.id}">✕</button>
+          </div>`).join('')}</div>` : '';
+        return `
+        <div class="note-card">
+          <div class="note-time">${new Date(n.createdAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</div>
+          <div class="note-text">${escHtml(n.text)}</div>
+          <button class="note-del" data-note-id="${n.id}">✕</button>
+          ${repliesHtml}
+          <div class="reply-form hidden" id="rform_${n.id}">
+            <textarea class="reply-textarea" placeholder="Write a reply…" maxlength="1000"></textarea>
+            <div class="reply-form-btns">
+              <button class="reply-form-btn cancel" data-rcancel="${n.id}">Cancel</button>
+              <button class="reply-form-btn save"   data-rsave="${n.id}">Reply</button>
+            </div>
+          </div>
+          <div class="note-footer">
+            <button class="note-reply-btn" data-reply-to="${n.id}">${replySVG} Reply</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+
+  document.getElementById('notes-add-btn-inner').addEventListener('click', openNoteModal);
+
+  el.querySelectorAll('.note-del').forEach(btn =>
+    btn.addEventListener('click', () => {
+      if (!confirm('Delete this note?')) return;
+      notes = notes.filter(n => n.id !== btn.dataset.noteId);
+      persistNotes(); renderNotes();
+    })
+  );
+  el.querySelectorAll('.reply-del').forEach(btn =>
+    btn.addEventListener('click', () => {
+      if (!confirm('Delete this reply?')) return;
+      const note = notes.find(n => n.id === btn.dataset.noteId);
+      if (note) note.replies = (note.replies || []).filter(r => r.id !== btn.dataset.replyId);
+      persistNotes(); renderNotes();
+    })
+  );
+  el.querySelectorAll('.note-reply-btn').forEach(btn =>
+    btn.addEventListener('click', () => {
+      const form = document.getElementById(`rform_${btn.dataset.replyTo}`);
+      const isHidden = form.classList.toggle('hidden');
+      if (!isHidden) setTimeout(() => form.querySelector('.reply-textarea').focus(), 40);
+    })
+  );
+  el.querySelectorAll('[data-rcancel]').forEach(btn =>
+    btn.addEventListener('click', () => document.getElementById(`rform_${btn.dataset.rcancel}`).classList.add('hidden'))
+  );
+  el.querySelectorAll('[data-rsave]').forEach(btn =>
+    btn.addEventListener('click', () => {
+      const noteId = btn.dataset.rsave;
+      const form   = document.getElementById(`rform_${noteId}`);
+      const text   = form.querySelector('.reply-textarea').value.trim();
+      if (!text) { showToast('Write something first'); return; }
+      const note = notes.find(n => n.id === noteId);
+      if (!note.replies) note.replies = [];
+      note.replies.push({ id: 'reply_' + Date.now(), text, createdAt: Date.now() });
+      persistNotes(); renderNotes();
+    })
+  );
+  el.querySelectorAll('.reply-textarea').forEach(ta =>
+    ta.addEventListener('keydown', e => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        ta.closest('.reply-form').querySelector('[data-rsave]').click();
+      }
+      if (e.key === 'Escape') ta.closest('.reply-form').classList.add('hidden');
+    })
+  );
+}
+
+function openNoteModal() {
+  document.getElementById('note-textarea').value = '';
+  document.getElementById('note-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('note-textarea').focus(), 50);
+}
+function closeNoteModal() {
+  document.getElementById('note-modal').classList.add('hidden');
+}
+function saveNote() {
+  const text = document.getElementById('note-textarea').value.trim();
+  if (!text) { showToast('Write something first'); return; }
+  notes.unshift({ id: 'note_' + Date.now(), text, createdAt: Date.now() });
+  persistNotes();
+  closeNoteModal();
+  renderNotes();
+  showToast('Note saved');
+}
+document.getElementById('note-cancel').addEventListener('click', closeNoteModal);
+document.getElementById('note-save').addEventListener('click', saveNote);
+document.getElementById('note-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeNoteModal(); });
+document.getElementById('note-textarea').addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') saveNote();
+  if (e.key === 'Escape') closeNoteModal();
+});
+
+// ── TOAST ─────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── SERVICE WORKER ────────────────────────────────────────────────
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+
+// Initial render
+renderProgress();
+renderFiles();
+renderNotes();
+
+</script>
+</body>
+</html>
